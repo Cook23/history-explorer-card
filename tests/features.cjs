@@ -1437,6 +1437,25 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── '<' and '>': a screen less a graduation at least, on a graduation; the present a stop ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { series: true }, clock: '2026-11-19T10:17:00+01:00', timezone: 'Europe/Paris' });
+    await t.wait(1500);
+    await t.step('\'<\' and \'>\': the window a screen less a graduation before or after, its end (\'<\') or start (\'>\') on a graduation; \'>\' stops with the end on the right edge, the next one after it, then greyed; \'<\' from after it back to the end on the right edge', async () => {
+        const W = () => t.E(`(()=>{ const I=el.instance, a=+new Date(I.startTime), b=+new Date(I.endTime), c=graphAt(0).chart; return { a, b, P: +I.realTimeEnd(), G: I.graduationMs(), live: !!I.state.autoScroll, greyed: el.querySelector('#b2_0').disabled, endOnTick: c.hecTimeTick(b, 0) === b, startOnTick: c.hecTimeTick(a, 0) === a }; })()`);
+        const step = async d => { await t.E(`el.instance.stepDay(${d})`); await t.wait(400); return W(); };
+        const w0 = await W(), b1 = await step(-1), b2 = await step(-1), f1 = await step(1), f2 = await step(1), f3 = await step(1), f4 = await step(1), r1 = await step(-1), r2 = await step(-1);
+        const span = w0.b - w0.a, near = (x, y) => Math.abs(x - y) <= 1500;
+        // (back a screen less a graduation at least, on a graduation: less than one more)
+        const back = (p, q) => q.endOnTick && p.b - q.b <= span - p.G + 1 && p.b - q.b >= span - 2 * p.G - 1 && !q.live;
+        const ok = w0.live && !w0.greyed && back(w0, b1) && back(b1, b2)
+            && f1.startOnTick && f1.a > b2.a && near(f2.b, f2.P) && f2.live && !f2.greyed
+            && near(f3.b, f3.P + f3.G) && f3.live && f3.greyed && near(f4.b, f4.P + f4.G) && f4.greyed
+            && near(r1.b, r1.P) && r1.live && !r1.greyed && back(r1, r2);
+        return ok ? true : JSON.stringify({ w0, b1, b2, f1, f2, f3, f4, r1, r2 });
+    });
+    done(await t.close());
+
     // ── Midnight, in the browser's time zone (Paris: a day starting 2 h before UTC's) ──
     {
         const now = Date.parse('2026-10-19T18:19:00+02:00') / 1000, ago = iso => now - Date.parse(iso) / 1000;
@@ -1863,9 +1882,10 @@ module.exports = async function()
             return __ws.slice(n0).filter(w => w.period === 'hour' && Date.parse(w.end) > from).map(w => [w.start, w.end]); })()`);
         return r.length === 0 ? true : JSON.stringify(r);
     });
-    await t.step('the window moved back (<): the hourly statistics of the side — a short part, the same for all — in one request for the three entities', async () => {
+    await t.step('the window moved back a day: the hourly statistics of the side — a short part, the same for all — in one request for the three entities', async () => {
         const n0 = await t.E('__ws.length');
-        await t.E(`el.querySelector('#b1_0').click()`); await t.wait(3000);
+        // (a day: the side beyond the history kept — '<' moves a screen less a graduation)
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) - 86400e3))`); await t.wait(3000);
         const r = await t.E(`__ws.slice(${n0}).filter(w => w.period === 'hour').map(w => [w.start, w.end, w.ids.length])`);
         return r.length >= 1 && r.every(w => w[2] === 3) ? true : JSON.stringify(r);
     });

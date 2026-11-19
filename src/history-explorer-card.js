@@ -244,7 +244,7 @@ export class HistoryCardState {
             // (the time window known before the graphs are built: their time axis has it
             // from the first drawing — without it, it spans the data, ticked for the
             // window's range: thousands of labels over each other until the window is set)
-            this.setPresentWindow();
+            this.setEndWindow();
 
             // Every graph (static and dynamic) built from the entity list
             if( this.store.list ) this.buildGraphsFromStore();

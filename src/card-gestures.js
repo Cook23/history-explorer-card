@@ -260,7 +260,7 @@ export class CardGestures
     // (deltaFactor: in widths of the time axis, > 0 rightward, so towards the past) or 'end'.
     // While it moves, only the graph being dragged is redrawn, unless lockAllGraphs.
     // A pinch that starts in real time stays there when a finger starts or ends it on the
-    // right of the plot area (see _keepsPresent): its end puts the present back on the right.
+    // right of the plot area (see _keepsEnd): its end puts the end (realTimeEnd) back where it was.
     onTimePan(info)
     {
         if( info.phase === 'start' ) {
@@ -280,7 +280,7 @@ export class CardGestures
         } else {
             this.state.drag = false;
             this.state.updateCanvas = null;
-            if( info.source === 'pinch' && this._pinchLive && this._keepsPresent(info) ) {
+            if( info.source === 'pinch' && this._pinchLive && this._keepsEnd(info) ) {
                 this.today(false, this.state.realTimeGap);
             } else {
                 this.updateHistory();
@@ -291,10 +291,10 @@ export class CardGestures
         }
     }
 
-    // Does a zoom gesture keep the present on the right — in real time, with the pointer in
+    // Does a zoom gesture keep the end (realTimeEnd) where it is — in real time, with the pointer in
     // the right 10 % of the plot area (the wheel), or a finger in its right 20 % at the start
     // or now (a pinch)? Otherwise it zooms around its own point, and leaves real time.
-    _keepsPresent(info)
+    _keepsEnd(info)
     {
         const _edge = info.source === 'wheel' ? 0.9 : 0.8;
         return [...( info.startFactors ?? [] ), ...( info.pointerFactors ?? [] )].some(f => f >= _edge);
@@ -302,13 +302,13 @@ export class CardGestures
 
     // zoomX: Ctrl+wheel or the spread of a pinch — one zoom step (+1 in, -1 out), like the
     // zoom buttons, around the time at centerFactor along the time axis
-    // In real time, a wheel or a pinch that keeps the present (_keepsPresent) zooms keeping
+    // In real time, a wheel or a pinch that keeps the end (_keepsEnd) zooms keeping
     // the window's end; otherwise around its own point.
     onTimeZoom(info)
     {
         if( info.centerFactor === undefined ) return;
         const _live = info.source === 'pinch' ? this._pinchLive : this.isLive();
-        const [tc, tp] = ( _live && this._keepsPresent(info) ) ? this.presentAnchor() : [this.factorToTimecode(info.centerFactor), info.centerFactor];
+        const [tc, tp] = ( _live && this._keepsEnd(info) ) ? this.endAnchor() : [this.factorToTimecode(info.centerFactor), info.centerFactor];
         if( info.step > 0 ) this.incZoomStep(tc, tp); else this.decZoomStep(tc, tp);
     }
 

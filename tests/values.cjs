@@ -77,11 +77,12 @@ module.exports = async function()
     // ── Recomputed for the window shown ──
     t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.energy', type: 'line', showStats: true }] }] }), { mock: { series: true }, height: 700 });
     await t.wait(1500);
-    await t.step('the window moved back a day: the statistics are the ones of that day', async () => {
+    await t.step('the window moved back (<): the statistics are the ones of the window then shown', async () => {
         const a = (await values(t)).stats[0];
         await t.E(`el.querySelector('#b1_0').click()`); await t.wait(1500);
         const b = (await values(t)).stats[0];
-        return num(b, 'max') < num(a, 'min') ? true : a + ' -> ' + b;
+        // (a total growing: the earlier window's lower — a graduation shared by both)
+        return num(b, 'max') < num(a, 'max') && num(b, 'min') < num(a, 'min') ? true : a + ' -> ' + b;
     });
     done(await t.close());
 
@@ -91,7 +92,8 @@ module.exports = async function()
     t = await openCard(card({ defaultTimeOffset: '1D', groupBy: 'date', rounding: 4, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showStats: ['average'] }] }] }),
         { mock: { series: true }, height: 700 });
     await t.wait(1500);
-    await t.E(`el.querySelector('#b1_0').click()`); await t.wait(1500);
+    // (yesterday, from the calendar: the window from midnight to midnight)
+    await t.E(`el.instance.showDay((d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))(new Date(Date.now()-86400e3)))`); await t.wait(1500);
     await t.step('the average shown over a graph and the point of a day\'s group are the same mean', async () => {
         const r = await t.E(`(()=>{ const i=el.instance, s=new Date(i.startTime).getTime(), e=new Date(i.endTime).getTime();
             const p=i.graphs[0].chart.data.datasets[0].data.find(p=>p.columnFrom===s && p.columnTo===e); return { y: p?.y, s, e }; })()`);

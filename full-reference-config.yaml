@@ -571,10 +571,10 @@ defaultTimeRange: '24'
 # What the magnifying glass's elastic box zooms when the card opens: x (the time), y (the Y axis) or xy (both). Kept or not as the time range is.
 defaultMagnifierMode: 'xy'
 
-# The present — where the window ends when the card opens, and how real time follows the new values (also: defaultTimeOffset).
+# The end — where the window ends when the card opens, and how real time follows the new values (also: defaultTimeOffset).
 # Not set: now, the window sliding with each new value. Lower case (1h): an hour after now — filled, then a step on.
 # Upper case (1D): snapped to the current hour, day, month or year. Negative (-1d): a day behind now, sliding.
-# Real time while the place of the new values is on screen; the window goes a time-axis graduation past the present at most.
+# Real time while the place of the new values is on screen; the window goes a time-axis graduation past the end at most.
 realTimeStep: undefined
 
 # The gesture thresholds — for every card and info panel of the page, and every device (the last one to speak,

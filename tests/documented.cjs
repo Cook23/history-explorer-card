@@ -95,7 +95,7 @@ module.exports = async function()
             return ok ? true : JSON.stringify(r);
         });
         await t.step('defaultTimeOffset (realTimeStep\'s other name): 1h — the present an hour after now, the window ending there', async () => {
-            const r = await t.E(`Math.round((el.instance.presentTime().valueOf() - Date.now()) / 60e3)`);
+            const r = await t.E(`Math.round((el.instance.realTimeEnd().valueOf() - Date.now()) / 60e3)`);
             return r === 60 ? true : `${r} min`;
         });
         await t.step('an entity of state class measurement_angle, without a unit: circular, period 360', async () => {

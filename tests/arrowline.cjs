@@ -96,9 +96,9 @@ module.exports = async function()
             const a = await drawn(1), b = await drawn(6);
             return a.k.length > 5 && a.k.every(k => k === 0.5) && b.points > 5 && !b.k.length ? true : JSON.stringify({ a, b });
         });
-        await t.step('arrowLength: an entity — each arrow its value over the scale chosen automatically (its largest value around the window: the whole length)', async () => {
+        await t.step('arrowLength: an entity — each arrow its mean over the scale chosen automatically (the largest mean of an arrow\'s zone around the window: the whole length, the longest arrow at it or nearly)', async () => {
             const r = await drawn(2), m = await t.E(`graphAt(2).chart.data.datasets[0].arrowLength`);
-            return r.k.length > 5 && Math.max(...r.k) > 0.9 && Math.min(...r.k) < 0.5 && r.k.every(k => k > 0 && k <= 1) && m.max >= 590 && m.max <= 700 && m.unit === 'W' ? true : JSON.stringify({ r, m });
+            return r.k.length > 5 && Math.max(...r.k) > 0.9 && Math.min(...r.k) < 0.5 && r.k.every(k => k > 0 && k <= 1) && Math.max(...r.k) >= 0.95 && m.max >= 500 && m.max <= 700 && m.unit === 'W' ? true : JSON.stringify({ r, m });
         });
         await t.step('arrowMax: 1200 — the whole length at 1200, no automatic scale; ~2400: at least 2400', async () => {
             const a = await drawn(3), m3 = await t.E(`graphAt(3).chart.data.datasets[0].arrowLength.max`), m4 = await t.E(`graphAt(4).chart.data.datasets[0].arrowLength.max`);
@@ -204,6 +204,14 @@ module.exports = async function()
             const _cw = s => s.every(x => Math.abs(( x[3] % ( 2 * Math.PI ) ) - Math.PI / 2) < 0.01 && Math.abs(x[4] - x[3] - Math.PI / 18) < 0.01 && x[2] > 10);
             return both.sec.length > 5 && both.sec.length % 2 === 0 && max.sec.length * 2 === both.sec.length
                 && _cw(max.sec) && both.style.every(c => /, ?0\.3\)$/.test(c)) ? true : JSON.stringify({ both: both.sec.length, max: max.sec.slice(0, 2), style: both.style });
+        });
+        await t.step('extremes far longer than the arrow (its zone\'s longest length 10 times its mean): the sector\'s radius within the band — at most from the foot of an upright arrow as long to the band\'s top', async () => {
+            await rows(1, 'k=>k%2?10:350', 'k=>k%2?1:3', { min: true, max: true });
+            await t.E(`(()=>{ const c=graphAt(1).chart; for( const r of c.data.datasets[0].data ) r[4].lenMax = 10 * r[3]; c.update(0); })()`);
+            const r = await drawn(1);
+            // (from the arrow's middle: its foot at hypot(x, y); the band 30 px high)
+            const over = r.sec.filter(x => x[2] > 15 + Math.hypot(x[0], x[1]) + 0.01);
+            return r.sec.length > 5 && !over.length ? true : JSON.stringify({ n: r.sec.length, over: over.slice(0, 3) });
         });
         await t.step('extremes from the YAML (showMinMax: true) on real values: sectors drawn where the values vary in an arrow\'s zone', async () => {
             const r = await drawn(4);

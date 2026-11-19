@@ -1653,8 +1653,8 @@ export class CardHistory
         // (the window moved to now: drawn again whole, its time axis moved; else nothing shown
         // changes until an answer comes: only asked — each answer draws its own graphs again,
         // see _answered)
-        // (the time shown after the present — realTimeGap — kept: the window moved once the
-        // present reached, not its end)
+        // (the time shown after the end — realTimeGap — kept: the window moved once the end
+        // (realTimeEnd) reached, not the window's end)
         if( this.state.autoScroll && moment(last).subtract(this.state.realTimeGap ?? 0, 'ms') < now ) {
             this.today(false, this.state.realTimeGap ?? 0);
         } else {

@@ -3559,6 +3559,22 @@
       return Math.round(A ? A.right - A.left : this.width || 0);
     },
 
+    // The time axis' graduation n steps from time t (ms) — its ticks as drawn, their unit and
+    // step (Chart.hecTimeTicks), on the calendar (midnight, a month's first…): n 0, the one at
+    // or before t; 1, the next; -1, the one before… t itself when the axis isn't drawn yet
+    hecTimeTick: function (t, n) {
+      var s = null;
+      helpers.each(this.scales, function (x) { if (x._hecTimeStep && x._hecGenerate) s = x; });
+      if (!s) return t;
+      var st = s._hecTimeStep, view = Object.create(s.options);
+      view.time = Object.create(s.options.time); view.time.unit = st.unit; view.time.stepSize = st.stepSize;
+      var _span = ( Math.abs(n) + 2 ) * st.stepSize * TIME_UNIT_MS[st.unit];
+      var ts = s._hecGenerate(t - _span, t + _span, 0, view), i = -1;
+      for (var k = 0; k < ts.length; k++) if (ts[k] <= t) i = k;
+      var v = ts[i + n];
+      return v === undefined ? t : v;
+    },
+
     // The close button armed for ms (the card's: a first click on it): its × red in a red
     // circle until then — whether a click comes meanwhile, the card asks (hecCloseArmed)
     hecArmClose: function (ms) {

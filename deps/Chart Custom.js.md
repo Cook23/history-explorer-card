@@ -24,7 +24,7 @@ only:
 | Direction | Channel | What goes through it |
 |---|---|---|
 | Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration — its parameters: a Y axis' values (`ticks.dataMin` / `dataMax`), bounds, smallest range, margins, step, width; a time axis' unit and step; the magnifier's mode (`zoomSelectMode`, `zoomBoxAxes`) —, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `handleButtons`) |
-| Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()`, `hecPlotRect()`, `hecArmClose()`, `hecCloseArmed()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width and box; the close button armed — nothing else |
+| Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()`, `hecPlotRect()`, `hecTimeTick()`, `hecArmClose()`, `hecCloseArmed()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width and box; a graduation of the time axis; the close button armed — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
@@ -204,6 +204,12 @@ timeline or arrowline).
 `chart.hecEndTooltip()` closes the chart's tooltip at once (removed, not faded out) and ends
 its tooltip mode, the point it showed back to its normal look, no hover dot — the card calls
 it on every chart when one of its menus opens, so nothing of a tooltip stays over the menu.
+
+`chart.hecTimeTick(t, n)` — the time axis' graduation `n` steps from time `t` (ms), its ticks
+as drawn — their unit and step (`Chart.hecTimeTicks`), on the calendar (midnight, a month's
+first…): `n` 0, the one at or before `t`; 1, the next; -1, the one before; `t` itself before the
+axis is drawn. The card's `<` and `>` land on one: the graduation is Chart.js' alone, the card
+never rounds a time to it.
 
 `chart.hecPlotWidth()` — the width of the chart's plot area in pixels (its whole width
 before its first layout): how many columns of pixels the time axis has, for a curve

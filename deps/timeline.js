@@ -1027,9 +1027,13 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
                 if( sides?.min ) lo = Math.min(lo, _diff(it.r[2] + it.r[4].lo - value));
                 if( sides?.max ) hi = Math.max(hi, _diff(it.r[2] + it.r[4].hi - value));
             }
-            const reach = ( ARROW_SHAFT[1] - ARROW_TIP ) * lengthOf(_max).k;
+            // (its radius within the band: at most from the foot of an upright arrow as long as
+            // this one — its base, half its length below the middle — to the band's top, half
+            // its height above: the same whatever its direction)
+            const base = ( ARROW_SHAFT[1] - ARROW_BOX / 2 ) * k;
+            const reach = Math.min(( ARROW_SHAFT[1] - ARROW_TIP ) * lengthOf(_max).k, ( ARROW_BOX + 6 ) / 2 + base);
             if( ( lo < 0 || hi > 0 ) && reach > 0 && k > 0 ) {
-                const a = _angle(value), base = ( ARROW_SHAFT[1] - ARROW_BOX / 2 ) * k;
+                const a = _angle(value);
                 const bx = -Math.sin(a) * base, by = Math.cos(a) * base;
                 // (a direction's angle on the canvas: 0 to the right, clockwise — the arrow's
                 // pointing up turned by _angle)

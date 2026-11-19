@@ -14666,6 +14666,8 @@
                 // (Chart.hecTimeTicks, chart-hec.js); the step applied kept (_hecTimeStep)
                 var _fit = Chart.hecTimeTicks ? Chart.hecTimeTicks(me, min, max, generate, determineMajorUnit) : null;
                 me._hecTimeStep = _fit ? { unit: _fit.unit, stepSize: _fit.stepSize } : undefined;
+                // (its rule kept: the graduations on either side of a time — chart.hecTimeTick)
+                me._hecGenerate = generate;
                 timestamps = _fit ? _fit.timestamps : generate(min, max, me.getLabelCapacity(min), options);}
 
 

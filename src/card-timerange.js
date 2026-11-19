@@ -14,8 +14,8 @@ const Chart = window.HXLocal_Chart;
 const ranges = TIME_RANGES.filter(r => r.step !== false).map(r => r.hours);
 // The room Chart.js keeps between two time labels (autoSkipPadding, card-charts.js)
 export const TICK_LABEL_GAP_PX = 8;
-// A window ending this close to the present shows it (its end is set to the second)
-const PRESENT_MS = 1000;
+// A window ending this close to the end (realTimeEnd) ends there (its end is set to the second)
+const END_MS = 1000;
 
 export class CardTimeRange
 {
@@ -23,22 +23,23 @@ export class CardTimeRange
     // Moving the time window
     // --------------------------------------------------------------------------------------
 
-    // The window back to the present (setPresentWindow) — gap: the time kept after it, the
-    // real time's (state.realTimeGap: following the present, see updateHistoryAutoRefresh)
+    // The window back to the end (setEndWindow) — gap: the time kept after it, the real
+    // time's (state.realTimeGap: following the end, see updateHistoryAutoRefresh)
     today(resetRange = false, gap = 0)
     {
         if( resetRange )
             this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
 
-        this.setPresentWindow(gap);
+        this.setEndWindow(gap);
         this.updateHistory(!resetRange);
     }
 
-    // The present, as the window shows it: now, moved by realTimeStep (an empty space after
-    // now — the window filled, then moved a step on —, or the end of the hour, the day…; a
-    // negative one: a time before now, followed) — where the new values come to, the window
-    // going a time-axis graduation past it at most (_settleWindow)
-    presentTime()
+    // The end — where the window ends in real time; not the present, now, the time the new
+    // values come at —: now, moved by realTimeStep (a time after now: the step the new values
+    // fill, the window then moved a step on —, or the end of the hour, the day…; a negative
+    // one: a time before now, followed), the window going a time-axis graduation past it at
+    // most (_settleWindow)
+    realTimeEnd()
     {
         let endTime = moment();
         if( this.pconfig.realTimeStep ) {
@@ -59,11 +60,11 @@ export class CardTimeRange
         return endTime;
     }
 
-    // The time window ending at the present (presentTime), over the active range — real
+    // The time window ending at the end (realTimeEnd), over the active range — real
     // time; set before the graphs are first built, so their time axis has it from the start
-    setPresentWindow(gap = 0)
+    setEndWindow(gap = 0)
     {
-        const t1 = this.presentTime().add(gap, 'ms').startOf('second');
+        const t1 = this.realTimeEnd().add(gap, 'ms').startOf('second');
         this._setWindow(moment(t1).subtract(this.activeRange.timeRangeHours, "hour").subtract(this.activeRange.timeRangeMinutes, "minute"), t1);
     }
 
@@ -76,23 +77,23 @@ export class CardTimeRange
     }
 
     // Every window set (a range, a zoom, a drag, a day before or after, the calendar, the
-    // present): never more than a graduation of the time axis past the present
-    // (presentTime) — moved back to end there, whatever asked it: nothing after
+    // present): never more than a graduation of the time axis past the end
+    // (realTimeEnd) — moved back to end there, whatever asked it: nothing after
     // (state.nothingAfter, '>' greyed) —; real time (state.autoScroll) when the time the new
-    // values come to is on screen — from now to the present (realTimeStep: the step filling;
-    // none: now; negative: the present, before now) —, the window following them as they
-    // come with the time it shows after the present kept (state.realTimeGap); else the
+    // values come to is on screen — from now to the end (realTimeStep: the step filling;
+    // none: now; negative: the end, before now) —, the window following them as they
+    // come with the time it shows after the end kept (state.realTimeGap); else the
     // history, the window staying where it is. The toolbar shows both (showRealTime)
     _settleWindow()
     {
-        const _present = this.presentTime(), _limit = moment(_present).add(this.graduationMs(), 'ms'), _over = moment(this.endTime).diff(_limit);
+        const _end = this.realTimeEnd(), _limit = moment(_end).add(this.graduationMs(), 'ms'), _over = moment(this.endTime).diff(_limit);
         if( _over > 0 ) {
             this.startTime = moment(this.startTime).subtract(_over, 'ms').format('YYYY-MM-DDTHH:mm:ss');
             this.endTime = _limit.format('YYYY-MM-DDTHH:mm:ss');
         }
-        const _after = moment(this.endTime).diff(_present);
-        this.state.nothingAfter = moment(this.endTime).diff(_limit) > -PRESENT_MS;
-        this.state.autoScroll = _after > -PRESENT_MS && moment(this.startTime).diff(moment.min(moment(), _present)) <= PRESENT_MS;
+        const _after = moment(this.endTime).diff(_end);
+        this.state.nothingAfter = moment(this.endTime).diff(_limit) > -END_MS;
+        this.state.autoScroll = _after > -END_MS && moment(this.startTime).diff(moment.min(moment(), _end)) <= END_MS;
         this.state.realTimeGap = this.state.autoScroll ? Math.max(0, _after) : 0;
         this.showRealTime();
     }
@@ -110,12 +111,12 @@ export class CardTimeRange
     }
 
     // The window starting at the start of day (YYYY-MM-DD, the calendar — openCalendar), as
-    // the toolbar's date shows it, the range kept; reaching the present, real time
+    // the toolbar's date shows it, the range kept; reaching the end, real time
     showDay(day)
     {
         if( !day ) return;
         const t0 = moment(day).startOf('day');
-        if( moment(t0).add(this.timeRangeSeconds(), 'second') >= this.presentTime() ) return this.todayNoReset();
+        if( moment(t0).add(this.timeRangeSeconds(), 'second') >= this.realTimeEnd() ) return this.todayNoReset();
         this.moveTimeWindow(t0);
         this.applyTimeAxes();
     }
@@ -128,15 +129,38 @@ export class CardTimeRange
         this.writeLocalState();
     }
 
-    // The toolbar's '<' (dir -1) and '>' (dir 1): the window a day — a month from a month's
-    // range — before or after, from the start of its day, a day long at least
+    // The toolbar's '<' (dir -1) and '>' (dir 1), the range kept: the window a screen less a
+    // graduation of the time axis at least before or after — its start ('>') or its end ('<')
+    // on a graduation, as Chart.js draws them (hecTimeTick): what was on one edge still on the
+    // other. The end (realTimeEnd) a stop: '>' passing it stops with it on the right edge,
+    // the next one goes after it (a graduation at most, _settleWindow); '<' from after it comes
+    // back with it on the right edge
     stepDay(dir)
     {
-        if( this.activeRange.timeRangeHours < 24 ) this.applyTimeRange(24, false);
-
-        const t0 = moment(this.startTime).add(dir, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
-        const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
-        this._setWindow(t0.startOf('day'), t1.startOf('day'));
+        const t0 = moment(this.startTime).valueOf(), t1 = moment(this.endTime).valueOf(), span = t1 - t0, G = this.graduationMs();
+        const P = this.realTimeEnd().valueOf(), _chart = this.graphs.find(g => g.chart)?.chart;
+        const _tick = (t, n) => _chart ? _chart.hecTimeTick(t, n) : t;
+        let end;
+        if( dir > 0 ) {
+            if( t1 >= P - END_MS ) end = P + G;
+            else {
+                // (the new start: the graduation at or before a screen less a graduation on —
+                // past the window's start at least)
+                let s = _tick(t0 + span - G, 0);
+                if( s <= t0 ) s = _tick(t0, 1);
+                end = Math.min(s + span, P);
+            }
+        } else {
+            if( t1 > P + END_MS ) end = P;
+            else {
+                // (the new end: the graduation at or after a screen less a graduation back —
+                // before the window's end at least)
+                const x = t1 - span + G, g = _tick(x, 0);
+                end = g >= x ? g : _tick(x, 1);
+                if( end >= t1 ) { const g0 = _tick(t1, 0); end = g0 < t1 ? g0 : _tick(t1, -1); }
+            }
+        }
+        this._setWindow(moment(end - span), moment(end));
 
         this.updateHistory(true);
     }
@@ -219,27 +243,27 @@ export class CardTimeRange
         this.writeLocalState();
     }
 
-    // Is the window showing the present, following it (real time) — rather than the history?
+    // Is the window following the new values (real time) — rather than the history?
     isLive()
     {
         return !!this.state.autoScroll && moment() >= moment(this.startTime);
     }
 
     // Where a range change without a point of its own keeps the window: [time, position
-    // along it] — the present in real time: it stays where it is (presentAnchor); its middle
+    // along it] — the end in real time: it stays where it is (endAnchor); its middle
     // when looking at the history. The one rule of every range change (applyTimeRange,
     // applyTimeRangeMinutes): the buttons, the duration menu, the magnifier's default range,
-    // a zoom gesture in real time keeping the present (onTimeZoom)
+    // a zoom gesture in real time keeping the end (onTimeZoom)
     _rangeAnchor()
     {
-        return this.isLive() ? this.presentAnchor() : [moment((moment(this.startTime) + moment(this.endTime)) / 2), 0.5];
+        return this.isLive() ? this.endAnchor() : [moment((moment(this.startTime) + moment(this.endTime)) / 2), 0.5];
     }
 
-    // The present and where it is along the window — [time, position]: on the right, or
+    // The end (realTimeEnd) and where it is along the window — [time, position]: on the right, or
     // before the time shown after it (state.realTimeGap)
-    presentAnchor()
+    endAnchor()
     {
-        const t0 = moment(this.startTime), _span = moment(this.endTime).diff(t0), P = this.presentTime();
+        const t0 = moment(this.startTime), _span = moment(this.endTime).diff(t0), P = this.realTimeEnd();
         return [P, _span > 0 ? Math.min(1, Math.max(0, P.diff(t0) / _span)) : 1.0];
     }
 
