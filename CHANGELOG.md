@@ -19,7 +19,7 @@ Changelog for the HA History Explorer Card.
 ### Internal
 - `arrowSpacing`, the room between two arrows, given by the card; a row's `turn`, how far its direction went each way (`deps/timeline.js.md`)
 - The time window's end in real time named so in the code: `realTimeEnd()`, `endAnchor()`, `setEndWindow()`, `END_MS`, `_keepsEnd()` (were `presentTime()`, `presentAnchor()`, `setPresentWindow()`, `PRESENT_MS`, `_keepsPresent()` — the end, not the present, with `realTimeStep`)
-- Tests (`features`, `panel`): `<` and `>` — the step, the end a stop; (`values`, `features`): `<` no longer a day; (`arrowline`): the sectors and their radius within the row, a whole turn's disc, the length's scale on the zone means
+- Tests (`features`, `panel`, `mouse`): `<` and `>` — the step, its start on a round time, the end a stop; (`values`, `features`): `<` no longer a day; (`arrowline`): the sectors and their radius within the row, a whole turn's disc, the length's scale on the zone means
 
 
 ## [v1.2.88] - 2026-11-19
