@@ -816,6 +816,22 @@ module.exports = async function()
         return r.far.length >= 1 && r.far[0][0] === 2 && r.far[0][1] >= 29 && !r.before && !r.loading ? true : JSON.stringify(r);
     });
     done(await t.close());
+    // (the same, the angle of state class measurement_angle: its statistics' mean circular, as Home Assistant compiles it)
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '30d', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.wind_a' }, { entity: 'sensor.power' }] }] },
+        { height: 900, mock: { series: true, states: { 'sensor.wind_a': { state: '200', unit: '°', state_class: 'measurement_angle' } } },
+          init: "document.addEventListener('DOMContentLoaded', ()=>{ document.body.style.width='400px'; const h=document.getElementById('host'); if( h ) h.style.width='400px'; })" });
+    await settle(t, 90000);
+    await t.step('an angle of state class measurement_angle drawn from statistics: drawn from them as any other curve — its history not asked besides', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime);
+            const st = __ws.filter(w => w.type === 'recorder/statistics_during_period' && w.ids.includes('sensor.wind_a'));
+            const h = __ws.filter(w => w.type === 'history/history_during_period' && Date.parse(w.start) < Date.now() - 26 * 3600e3 && w.ids.includes('sensor.wind_a'));
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
+            const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0 && x(p) <= t1);
+            return { circular: !!I.circularPeriodOf(I.graphs[0].entities[0]), stats: st.length, hist: h.length, drawn: d.length, fromStats: d.filter(p => p.statistics).length, source: I._sourceNeeded() }; })()`);
+        return r.circular && r.source !== 'history' && r.stats >= 1 && r.hist === 0 && r.drawn > 0 && r.fromStats > r.drawn / 2 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
 
     // ── The requests regulated (ha-requests.js): in order, at once, as many in flight as Home
     // Assistant's workers ──

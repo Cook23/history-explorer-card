@@ -339,13 +339,16 @@ export class CardHistory
     }
 
     // The angles among the entities with statistics — circular (see circularPeriodOf) wherever
-    // one of its uses takes it as such, the entity being in the cache once —: Home
-    // Assistant may average them as plain numbers — wrong across 0 —, so their history is
-    // asked besides wherever they're drawn from statistics (see _askMissing)
+    // one of its uses takes it as such, the entity being in the cache once —, but those of
+    // state class measurement_angle: Home Assistant averages the others as plain numbers —
+    // wrong across 0 —, so their history is asked besides wherever they're drawn from
+    // statistics (see _askMissing); a measurement_angle's statistics are a circular mean
+    // (Home Assistant's sensor/recorder.py), drawn as any other's
     _angleIds(statIds)
     {
         const _angles = new Set();
-        for( const g of this.graphs ) for( const e of g.entities ) if( this.circularPeriodOf(e) ) _angles.add(e.entity);
+        for( const g of this.graphs ) for( const e of g.entities )
+            if( this.circularPeriodOf(e) && this.getStateClass(e.entity) !== 'measurement_angle' ) _angles.add(e.entity);
         return statIds.filter(id => _angles.has(id));
     }
 
@@ -815,8 +818,8 @@ export class CardHistory
     // the coarser ones (where the recorder keeps no finer one). Among the history, phase 2's
     // source, fam from its finest to phase 1's source (no phase 1: fam's finest, where phase
     // 2's comes back empty) — never statistics not valid for it, nor coarser ones loaded for
-    // another window. An angle: the finest first — its history asked to correct the
-    // statistics (Home Assistant averages angles as plain numbers, see _background); hourly
+    // another window. An angle (_angleIds: not a measurement_angle): the finest first — its history asked to correct the
+    // statistics (Home Assistant averages them as plain numbers, see _angleIds, _background); hourly
     // statistics not valid for it too: its history first, the hourly ones where it isn't kept
     // (past the recorder's retention) — their periods made up held (heldRuns). An entity
     // without statistics: every one (its history only)
@@ -1106,7 +1109,7 @@ export class CardHistory
 
     // Once the window has come, in the background — one request at a time, Home Assistant
     // free (_backgroundFree), the entities of a source together —: first, the history of the
-    // angles drawn from statistics (Home Assistant may average them as plain numbers — wrong
+    // angles drawn from statistics (_angleIds: Home Assistant may average them as plain numbers — wrong
     // across 0) over the window, a block at a time from the right; then each side widened,
     // the block nearest the window first: phase 2's source a window on each side, in its
     // blocks; phase 1's beyond what phase 1 asked, up to HORIZON windows, in blocks 10 times

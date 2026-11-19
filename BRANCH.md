@@ -95,7 +95,8 @@ retention, the entity created later) — an attribute, told by its entity's hist
   when nothing else is under way, 1 s after the last change, then a pause of twice what the
   last one took, 1 s to 30 s):
   - first, the history of the circular axes over the window shown, where they're drawn from
-    statistics (Home Assistant averages angles as plain numbers);
+    statistics (Home Assistant averages angles as plain numbers — not those of state class
+    `measurement_angle`, their statistics' mean circular);
   - then the exports' probes: what each source can give the entities exported, a request at
     most;
   - then each side widened: phase 1's source in blocks 10 × phase 2's, phase 2's source in its

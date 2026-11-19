@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.91] - 2026-11-19
+
+### Changed
+- An angle of state class `measurement_angle` drawn from its statistics as any other curve — Home Assistant's mean of it circular, right across 0 (before: its history asked besides wherever drawn from statistics, as for an angle Home Assistant averages as a plain number)
+
+### Docs
+- README_Full.md: Home Assistant's statistics of an angle wrong only when its state class isn't `measurement_angle`
+
+### Internal
+- Tests (`yscale`): an angle of state class `measurement_angle` drawn from its statistics, its history not asked besides; the mocked Home Assistant compiles a `measurement_angle`'s statistics as it does — a circular mean alone
+
+
 ## [v1.2.90] - 2026-11-19
 
 ### Changed
