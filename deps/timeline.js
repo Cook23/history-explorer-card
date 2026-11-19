@@ -1,4 +1,6 @@
 
+import { circularMean, timeWeightedMean, wrapDiff } from "../src/history-stats.js";
+
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
@@ -746,6 +748,8 @@ const ARROW_PATH = typeof Path2D !== 'undefined' ? new Path2D('M7.03 9.97H11.03V
 // the head's base to its end, as wide)
 const ARROW_HEAD = typeof Path2D !== 'undefined' ? new Path2D('M7.03 9.97H17.03L12.03 4.97Z') : null;
 const ARROW_SHAFT = [9.97, 18.9], ARROW_SHAFT_WIDTH = 2;
+// (its tip, in its box: the far end of its length from its base, ARROW_SHAFT[1])
+const ARROW_TIP = 4.97;
 
 Chart.scaleService.registerScaleType('arrowline', ArrowlineScale, ArrowlineConfig);
 
@@ -953,71 +957,116 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
         let ofs = xp % arrow_spacing;
 
         // (its arrows' length — the dataset's arrowLength, see deps/timeline.js.md: none, every
-        // arrow its whole length; { fraction }, every arrow that part of it; { max }, each block's
-        // value [3] over max — its absolute value, at most the whole length; max 0, a point —, a
-        // block without one its whole length, its shaft dashed)
+        // arrow its whole length; { fraction }, every arrow that part of it; { max }, a length x
+        // over max — its absolute value, at most the whole length; max 0, a point —, none
+        // (undefined) its whole length, its shaft dashed)
         const L = ds?.arrowLength;
-        const lengthOf = block => !L ? { k: 1 } : L.fraction !== undefined ? { k: L.fraction }
-            : block[3] === undefined || block[3] === null ? { k: 1, dashed: true } : { k: L.max > 0 ? Math.min(1, Math.abs(block[3]) / L.max) : 0 };
+        const lengthOf = x => !L ? { k: 1 } : L.fraction !== undefined ? { k: L.fraction }
+            : x === undefined ? { k: 1, dashed: true } : { k: L.max > 0 ? Math.min(1, Math.abs(x) / L.max) : 0 };
+        // (a full turn is the dataset's arrowPeriod — the entity's circular period, else the
+        // card's default one — so an angle in radians or grads points the right way too)
+        const _angle = v => ( v / ds.arrowPeriod * 360 + 180 ) / 180.0 * Math.PI;
+        // (its means: circular for a circular entity — the dataset's circularPeriod, its period;
+        // null: a number's, as they are —, see deps/timeline.js.md)
+        const P = ds.circularPeriod;
+        const _mean = (items, value, w) => P ? circularMean(items, value, () => 0, w, P).mean : timeWeightedMean(items, value, () => 0, w);
+        const _diff = d => P ? wrapDiff(d, P) : d;
 
         let j = 0;
 
         for( let i = 0; i < n; i++ ) {
 
-            let value = null, block = null, at = -1;
-
             const x0 = i * arrow_spacing + area.left + ofs;
-
             const xmid = x0 + ARROW_BOX / 2;
-            for( ; j < metaData.length; j++ ) {
-                const x0 = metaData[j].getPosition(0);
-                const x1 = metaData[j].getPosition(1);
-                if( x1 > xmid ) {
-                    if( xmid >= x0 ) {
-                        value = metaData[j].getValue() * 1.0;
-                        block = ds.data[j];
-                        at = j;
-                    }
-                    break;
+
+            // (its zone: arrow_spacing wide, its middle the arrow's — the rows in it, each the
+            // part of it there, f)
+            const za = xmid - arrow_spacing / 2, zb = xmid + arrow_spacing / 2;
+            while( j < metaData.length && metaData[j].getPosition(1) <= za ) j++;
+            const items = [];
+            let at = -1;
+            for( let k = j; k < metaData.length; k++ ) {
+                const p0 = metaData[k].getPosition(0), p1 = metaData[k].getPosition(1);
+                if( p0 >= zb ) break;
+                const f = p1 > p0 ? ( Math.min(p1, zb) - Math.max(p0, za) ) / ( p1 - p0 ) : 1;
+                if( f > 0 ) items.push({ r: ds.data[k], f });
+                if( p0 <= xmid && xmid < p1 ) at = k;
+            }
+            // (no row under its middle: no arrow — a gap, before the first value, after now)
+            if( at < 0 || !items.length ) continue;
+
+            // (its direction: the mean of the rows in its zone — the one rule, _mean —,
+            // each weighted by how long its values last there, times their length when the
+            // dataset's arrowWeighting is length and a length is known there)
+            const _len = items.filter(it => it.r[4].lenWeight > 0);
+            const value = ds?.arrowWeighting === 'length' && L?.max !== undefined && _len.length
+                ? _mean(_len, it => it.r[4].byLen, it => it.f * it.r[4].lenWeight)
+                : _mean(items, it => it.r[2], it => it.f * it.r[4].span);
+            // (its length: the mean of those known there, each weighted by how long; its
+            // highest, the extremes')
+            const _known = items.filter(it => it.r[3] !== undefined && it.r[4].lenSpan > 0);
+            const _lenMean = _known.length ? timeWeightedMean(_known, it => it.r[3], () => 0, it => it.f * it.r[4].lenSpan) : undefined;
+            const _max = _known.length ? _known.reduce((m, it) => Math.max(m, it.r[4].lenMax), -Infinity) : undefined;
+
+            const { k, dashed } = lengthOf(_lenMean);
+            // (its color: the row's under its middle — the dataset's arrowColors —, else the dataset's)
+            const color = ds?.arrowColors?.[at] ?? arrowColor;
+            ctx.setTransform(origMatrix);
+            ctx.translate(xmid, ybar);
+
+            // (its extremes — the rows' sides, showMinMax: see deps/timeline.js.md —: from its
+            // base, a triangle on each side asked, to the lowest — anticlockwise, min — and the
+            // highest direction — clockwise, max — around its own, as long as its longest
+            // length there, in its color at Chart.hecMinMaxBandAlpha)
+            let lo = 0, hi = 0;
+            for( const it of items ) {
+                const sides = it.r[4].sides;
+                if( sides?.min ) lo = Math.min(lo, _diff(it.r[2] + it.r[4].lo - value));
+                if( sides?.max ) hi = Math.max(hi, _diff(it.r[2] + it.r[4].hi - value));
+            }
+            const reach = ( ARROW_SHAFT[1] - ARROW_TIP ) * lengthOf(_max).k;
+            if( ( lo < 0 || hi > 0 ) && reach > 0 && k > 0 ) {
+                const a = _angle(value), base = ( ARROW_SHAFT[1] - ARROW_BOX / 2 ) * k;
+                const bx = -Math.sin(a) * base, by = Math.cos(a) * base;
+                const _to = v => [bx + Math.sin(_angle(v)) * reach, by - Math.cos(_angle(v)) * reach];
+                ctx.fillStyle = _color(color).alpha(Chart.hecMinMaxBandAlpha).rgbString();
+                for( const [p, q] of [[value + lo, value], [value, value + hi]] ) {
+                    if( p === q ) continue;
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by);
+                    ctx.lineTo(..._to(p));
+                    ctx.lineTo(..._to(q));
+                    ctx.closePath();
+                    ctx.fill();
                 }
             }
 
-            if( value != null ) {
-                const { k, dashed } = lengthOf(block ?? []);
-                // (its color: its block's — the dataset's arrowColors —, else the dataset's)
-                const color = ds?.arrowColors?.[at] ?? arrowColor;
-                ctx.setTransform(origMatrix);
-                ctx.translate(xmid, ybar);
-                if( k <= 0 ) {
-                    // (no length: a point)
-                    ctx.beginPath();
-                    ctx.arc(0, 0, ARROW_POINT_RADIUS, 0, 2 * Math.PI);
-                    ctx.fillStyle = color;
-                    ctx.fill();
-                    continue;
-                }
-                // (a full turn is the dataset's arrowPeriod — the entity's circular period, 360
-                // by default — so an angle in radians or grads points the right way too)
-                const period = ds?.arrowPeriod || 360;
-                ctx.rotate((value / period * 360 + 180) / 180.0 * Math.PI);
-                ctx.scale(k, k);
-                ctx.translate(-ARROW_BOX / 2, -ARROW_BOX / 2);
-                if( dashed ) {
-                    // (its head as always, its shaft dashed)
-                    ctx.fillStyle = color;
-                    ctx.fill(ARROW_HEAD);
-                    ctx.beginPath();
-                    ctx.moveTo(ARROW_BOX / 2, ARROW_SHAFT[0]);
-                    ctx.lineTo(ARROW_BOX / 2, ARROW_SHAFT[1]);
-                    ctx.setLineDash([2, 2]);
-                    ctx.lineWidth = ARROW_SHAFT_WIDTH;
-                    ctx.strokeStyle = color;
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                } else {
-                    ctx.fillStyle = color;
-                    ctx.fill(ARROW_PATH);
-                }
+            if( k <= 0 ) {
+                // (no length: a point)
+                ctx.beginPath();
+                ctx.arc(0, 0, ARROW_POINT_RADIUS, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+                continue;
+            }
+            ctx.rotate(_angle(value));
+            ctx.scale(k, k);
+            ctx.translate(-ARROW_BOX / 2, -ARROW_BOX / 2);
+            if( dashed ) {
+                // (its head as always, its shaft dashed)
+                ctx.fillStyle = color;
+                ctx.fill(ARROW_HEAD);
+                ctx.beginPath();
+                ctx.moveTo(ARROW_BOX / 2, ARROW_SHAFT[0]);
+                ctx.lineTo(ARROW_BOX / 2, ARROW_SHAFT[1]);
+                ctx.setLineDash([2, 2]);
+                ctx.lineWidth = ARROW_SHAFT_WIDTH;
+                ctx.strokeStyle = color;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else {
+                ctx.fillStyle = color;
+                ctx.fill(ARROW_PATH);
             }
 
         }

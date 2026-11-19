@@ -4,6 +4,24 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.88] - 2026-11-19
+
+### Added
+- An arrowline's extremes (`showMinMax`, *Appearance ▸ Extremes*, the curves' values): from each arrow's base, a light triangle on each side, to the lowest and highest direction of its zone, as long as its longest length there, in its color at the min/max band's opacity — `max` the clockwise side, `min` the anticlockwise one
+- `arrowWeighting`: an arrowline's arrows' direction weighted by how long and by the length `arrowLength`'s entity gives (`length`, the default), or by how long only (`none`)
+
+### Changed
+- An arrowline's arrows: each the mean of its zone — the time under it, as wide as the space between two arrows —, from the most precise data for each column of pixels: the direction's mean — circular for a circular entity, for its own period, Chart.js told the period (`circularPeriod`), never guessing 360 —, the length's mean, each value weighted by how long it lasts (before: the one value in force at the arrow's middle, the length read at the middle of that value's time)
+- An arrowline's tooltip: a column of pixels, as a curve's — the direction, then the length, each `min / mean / max` of the column (before: the one value in force there); its title the statistics where its values come from them (before: always the history)
+
+### Docs
+- README_Full.md, full-reference-config.yaml: each arrow the mean of its zone, `arrowWeighting`, an arrowline's extremes
+
+### Internal
+- `deps/timeline.js` imports `src/history-stats.js` (the one rule of means), documented in `deps/Chart Custom.js.md` (the contract) and `deps/timeline.js.md`; `tests/architecture.cjs`: Chart.js imports nothing of the card but it (`chart-imports`)
+- Tests (`arrowline`): a row a column, a value alone over several columns; each arrow the mean of its zone, weighted by its length or not; the extremes' triangles, their sides; *Appearance ▸ Extremes* on an arrowline
+
+
 ## [v1.2.87] - 2026-11-18
 
 ### Fixed

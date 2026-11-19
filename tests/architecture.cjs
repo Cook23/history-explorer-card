@@ -16,7 +16,7 @@ const documented = name => new RegExp('\\b' + name + '\\b').test(CONTRACT);
 function code(file)
 {
     const src = read(file), out = src.split('');
-    acorn.parse(src, { ecmaVersion: 2022, sourceType: file.startsWith('src/') ? 'module' : 'script',
+    acorn.parse(src, { ecmaVersion: 2022, sourceType: file.startsWith('src/') || /^import\s/m.test(src) ? 'module' : 'script',
         onComment: (block, text, start, end) => { for( let i = start; i < end; i++ ) if( out[i] !== '\n' ) out[i] = ' '; } });
     return out.join('');
 }
@@ -143,6 +143,10 @@ const RULES = [
           .filter(m => !GESTURE_ANSWERS.includes(m[1])).map(m => ({ index: m.index, text: m[0] })) },
     { id: 'chart-own-parameters', why: "Chart.js never writes its parameters (options): what it changes itself — the Y lock's range, a gesture's — is its own state",
       files: ['deps/chart-hec.js'], re: /\b(?:options|opts|_t|tickOpts)\.\w+(?:\.\w+)*\s*=(?!=)/g },
+    // (one rule for every mean, the card's and Chart.js' — an arrowline's arrows: deps/timeline.js)
+    { id: 'chart-imports', why: "Chart.js imports nothing of the card but its pure rules of means (src/history-stats.js: data only — no DOM, no Chart)",
+      files: ['deps/chart-hec.js', 'deps/timeline.js'], check: s => [...s.matchAll(/^\s*import\b[^;]*?from\s*["']([^"']+)["']/gm)]
+          .filter(m => m[1] !== '../src/history-stats.js').map(m => ({ index: m.index, text: m[0] })) },
     { id: 'no-business-in-chart', why: "Chart.js never knows what an entity, Home Assistant, the store or the card's texts are",
       files: ['deps/chart-hec.js', 'deps/timeline.js'], re: /\b(entity|entities|entity_id|hass|pconfig|store|i18n|statistics?)\b/gi },
     { id: 'no-spread-push', why: "an array is never spread into a call — push, unshift, splice, Math.min, Math.max: a browser takes a limited number of arguments (some 100 000 in Chrome) — past it, 'Maximum call stack size exceeded'; one way, whatever the list's size: history-arrays.js appendAll, insertAll, minOf, maxOf",

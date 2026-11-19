@@ -1084,7 +1084,8 @@ export class CardMenus
     // others, the curves
     _lookByGraph(m, key)
     {
-        const _takes = (g, e) => key === 'fill' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline' : this.isCurve(g, g.entities.indexOf(e));
+        const _takes = (g, e) => key === 'fill' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline'
+            : key === 'minmax' && g.type === 'arrowline' ? true : this.isCurve(g, g.entities.indexOf(e));
         return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e => _takes(g, e)) }))
             .filter(({ curves }) => curves.length);
     }
@@ -1104,7 +1105,8 @@ export class CardMenus
     // The appearance submenu's lines that apply to what menu m acts on: the color, for one
     // entity — a curve, a bar or an arrowline's row (not a timeline's: its colors are its
     // states') — or for arrowline rows only (each on a row of its own: one color for them all
-    // still tells them apart); the fill, for all but a timeline's rows; the others, for curves
+    // still tells them apart); the fill, for all; the length, for arrowline rows; the extremes,
+    // for curves and arrowline rows; the others, for curves
     _appearanceLines(m)
     {
         const { kind, pairs } = this._scopeOf(m);

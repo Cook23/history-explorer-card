@@ -63,6 +63,10 @@ graphs:
       # The value of arrowLength's entity giving the whole length (no automatic scale); '~' and a value: at least that one
       arrowMax: null
 
+      # An arrowline's arrows' direction, the mean of their zone: length, weighted by how long and by arrowLength's entity's value
+      # (by how long only without one); none, by how long only
+      arrowWeighting: length
+
       # The value now, in large, over the graph (the curve's colour and unit)
       showState: false
 
@@ -109,7 +113,8 @@ graphs:
       # Overrides the unit of measurement shown for this entity, instead of the one reported by HA
       unit: null
 
-      # (line graph only) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them)
+      # (line graph and arrowline) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them);
+      # an arrowline's: a light triangle each side of its arrows, to the lowest and highest direction of their zone (max: clockwise, min: anticlockwise)
       showMinMax: False
 
       # (line graph only) If true, show permanent dots at each measurement point making up the line — the line

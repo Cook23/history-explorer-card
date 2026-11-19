@@ -513,7 +513,7 @@ The curve menu's items each open their submenu over the menu, level with it — 
 - **Appearance ▸** — how an entity shown looks, for a curve or a bar; for an arrowline's row, *Color*, *Fill* and *Length* only; for a timeline's row, *Fill* only:
   - *Color ▸* — *Automatic*: the color it's given when it's added (its configuration's, else the one of what it measures — see [Colors of curves and bars](#colors-of-curves-and-bars)), in bold when it has it; *Choose…*: the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too. *Entity ▸*: the color from an entity (see below);
   - *Points ▸* — the curve's samples' dots (`showPoints`), a list: *None* (`false`), *Hovered* (`hover`), *All* (`true`) — see [Displaying individual samples](#displaying-individual-samples);
-  - *Extremes ▸* — its min/max band (`showMinMax`), a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range));
+  - *Extremes ▸* — its min/max band (`showMinMax`) — an arrowline's: its triangles —, a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range), [Compass arrow graphs](#compass-arrow-graphs));
   - *Fill ▸* — *None* (`fill: false`), *Fade* (`fill: fade`), *Light* (its color, light: `fill: light`), *Solid* (its color: `fill: solid`), *Entity ▸* (see below);
   - *Width ▸* — 1 to 5 px (`lineWidth`);
   - *Line style ▸* — *Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot* (`dashMode`);
@@ -1153,14 +1153,23 @@ An angle — a bearing, a direction, the wind's — is shown as a row of compass
 
 A compass arrow graph is the `arrowline` type, for the entities added from the card and the YAML's alike — examples in [Entity options](#entity-options) and in the complete example of [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs).
 
+**Each arrow** shows its zone — the time under it, as wide as the space between two arrows: the mean of the values there, from the most precise data the card has for each column of pixels (the history where it's kept, else the statistics), each weighted by how long it lasts:
+- a circular entity's direction (see [Circular values (angles)](#circular-values-angles)) has a circular mean, for its own period (350° and 10° give 0°, not 180°), by the same rule as every mean of an angle; an entity that isn't circular (`circular: false`), the mean of a number;
+- with a length from an entity (`arrowLength`, below), the direction is also weighted by the length — a strong wind counts more than a weak one —: `arrowWeighting: length`, the default; `arrowWeighting: none`, by how long only. A value without a length there doesn't count in it; none with one: by how long only;
+- the length is the mean of the length's values there.
+
+The tooltip shows a column of pixels, as a curve's: the direction, then the length, each `min / mean / max` of the column (the value alone when, rounded, the three are the same).
+
+**The extremes** — `showMinMax`, as a curve's band (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range)): from the arrow's base, a light triangle on each side, to the lowest and the highest direction of its zone around its own, as long as the longest length there, in the arrow's color. `max` is the clockwise side, `min` the anticlockwise one; `all` (or `true`) both; `statistics` / `history` both, only where the arrow comes from them.
+
 **The arrows' length** — `arrowLength`, on the card, in `entityOptions`, on a graph or on an entity:
 - not set: every arrow its whole length;
 - a number from 0 to 100: every arrow that part of its whole length, in % (0: a point); out of 0 to 100, it's kept within, with a warning in the browser's console;
 - thresholds on an entity's or attribute's value, as for `color` (see [Colors of curves and bars](#colors-of-curves-and-bars)), each giving a length from 0 to 100;
-- an entity, or one of its attributes (`weather.home.wind_speed`): each arrow its value at that time — the wind's speed with its direction:
+- an entity, or one of its attributes (`weather.home.wind_speed`): each arrow the mean of its values in the arrow's zone — the wind's speed with its direction:
   - its scale is chosen as the [automatic Y axis](#the-automatic-scale) chooses its top, with `yScaleSteadiness` at 50: the largest value in the window and around it gives the whole length, 0 a point; a negative value is drawn by its absolute value;
   - where the entity has no value, the arrow is drawn its whole length, its shaft dashed;
-  - the tooltip shows the value, signed, in its unit, after the direction.
+  - the tooltip shows its values, signed, in its unit, after the direction.
 
 `arrowMax` sets the value giving the whole length, as `ymax` sets a Y axis' top: a number — fixed, no automatic scale, a larger value drawn its whole length —, or `~` and a number — soft: the whole length at least that value, more where the values go past it. The bottom is always 0.
 
@@ -1170,9 +1179,11 @@ graphs:
   - type: arrowline
     title: Wind
     arrowMax: ~50                          # the whole length: 50 km/h at least
+    showMinMax: true                       # the directions' spread: a light triangle each side
     entities:
       - entity: sensor.wind_bearing
         arrowLength: sensor.wind_speed     # each arrow as long as the wind is fast
+        arrowWeighting: length             # (the default) the direction weighted by the speed
 ```
 
 ### Line appearance
@@ -2356,7 +2367,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`showPoints`**<br>*`showSamples`, `show_points`* | **Default** `hover`<br>Dots on the measured values: `hover`, only the one under the pointer; `true`, all of them; `false`, none; a number, all of them with that radius in px. A long press near the curve shows or hides them — see [Displaying individual samples](#displaying-individual-samples) |
 | **`sizePoints`** | **Default** the line width + 2 px<br>The diameter of the dots on the values, in px; without it, the line's width + 2 — see [Displaying individual samples](#displaying-individual-samples) |
 | **`showLine`**<br>*`show_line`* | **Default** `true`<br>`false`: the curve's points only, without the line between them — with `showPoints: true` to see them — see [Displaying individual samples](#displaying-individual-samples) |
-| **`showMinMax`** | **Default** `false`<br>A band between the minimum and the maximum around the curve, where several values fall in one point: `all` (or `true`), everywhere; `max` / `min`, only its half above / below the curve; `statistics` / `history`, only where the curve comes from them; `false`, none — see [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
+| **`showMinMax`** | **Default** `false`<br>A band between the minimum and the maximum around the curve, where several values fall in one point: `all` (or `true`), everywhere; `max` / `min`, only its half above / below the curve; `statistics` / `history`, only where the curve comes from them; `false`, none — see [Showing the min/max statistical range](#showing-the-minmax-statistical-range). An arrowline's: a light triangle each side of its arrows (`max` clockwise, `min` anticlockwise) — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`hidden`** | **Default** `false`<br>`true`: the curve hidden when the card opens; its legend label is struck through, and a click on it shows the curve — see [Legend / entity labels](#legend--entity-labels) |
 | **`legendVisible`**<br>*`show_legend`* | **Default** `true`<br>`false`: no legend label for the curves it's set for — set on every one, the graph has no legend. `auto`, on a graph or the card: a graph's legend only when it has several labels — see [Legend / entity labels](#legend--entity-labels) |
 | **`showCurrentValues`**<br>*`show_legend_state`* | **Default** `true`<br>`false`: the legend label shows the curve's name only, without its current value — see [Showing current sensor values](#showing-current-sensor-values) |
@@ -2373,6 +2384,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic: a small gap on both sides of each bar, by its interval<br>The room between two bars, in px; without it, a gap in proportion to each bar's interval — see [Bar graphs for total increasing entities](#bar-graphs-for-total-increasing-entities) |
 | **`arrowLength`** | **Default** not set: every arrow its whole length<br>The length of an arrowline's arrows: a number from 0 to 100, that part of their whole length; thresholds on a value giving one; or an entity or attribute whose value gives each arrow its length, scaled automatically on its largest value around the window (see `arrowMax`) — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity that gives an arrow its whole length; no automatic scale then. `~` and a value: at least that value, more when the values go past it — see [Compass arrow graphs](#compass-arrow-graphs) |
+| **`arrowWeighting`** | **Default** `length`<br>An arrowline's arrows' direction over their zone: `length`, weighted by how long and by the length `arrowLength`'s entity gives (by how long only without one); `none`, by how long only — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px. On the card: the height of every line and bar graph — `lineGraphHeight` and `barGraphHeight` win over it — see [Graph sizes](#graph-sizes) |
 | **`showGrid`** | **Default** `true`<br>`false`: no grid lines in the graph's plot |
 | **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under the graph — the plot takes their room, below and on its sides |

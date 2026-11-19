@@ -300,6 +300,8 @@ const OPTION_VALUES = {
     // arrowLengthOf; the value giving the whole length, as ymax)
     arrowLength   : _arrowLength,
     arrowMax      : _yBound,
+    // (an arrowline's arrows' direction over their zone: weighted by their length, by its time only)
+    arrowWeighting : oneOf('arrowWeighting', ['length', 'none']),
     yminRight     : _yBound,
     ymaxRight     : _yBound,
     yrange        : _positive,
@@ -484,6 +486,8 @@ export const OPTION_DEFAULTS = {
     uiLayout: { toolbar: 'top', selector: 'top', sticky: 'hide' },
     // (an arrowline's full turn, when its entity has no circular period — card-charts.js)
     arrowlinePeriod: 360,
+    // (an arrowline's arrows' direction: weighted by their length, when a series gives it — card-datasets.js _arrowColumns)
+    arrowWeighting: 'length',
     // (a curve's Y axis side — CardConfig.resolveYAxis —, what a click on its value does —
     // CardConfig.tapActionOf)
     yAxis: 'auto', tapAction: { action: 'more-info' },
@@ -513,7 +517,7 @@ export const CURVE_OPTION_KEYS = ['valueFactor', 'stateMap', 'colorTransition', 
 export const CURVE_GRAPH_KEYS = ['yAxis', 'showState', 'showStats', 'showStateFor', 'showStatsFor'];
 // The options copied onto a curve when it's added, from the levels above it (card-graphs.js
 // _levelFields — resolveOption): its own from then on, kept when it's moved to another graph
-export const CURVE_LEVEL_KEYS = ['dashMode', 'lineWidth', 'lineMode', 'interpolation', 'scale', 'netBars', 'showPoints', 'showMinMax', 'name', 'arrowLength', 'arrowMax',
+export const CURVE_LEVEL_KEYS = ['dashMode', 'lineWidth', 'lineMode', 'interpolation', 'scale', 'netBars', 'showPoints', 'showMinMax', 'name', 'arrowLength', 'arrowMax', 'arrowWeighting',
     'siConversionFactor', 'unit', 'process', 'circular', 'rounding', 'tapAction', 'showCurrentValues', ...CURVE_OPTION_KEYS];
 // A curve's options given when it's added besides the levels' (card-graphs.js
 // _applyEntityDefaults: the palette's when none is set)
@@ -534,7 +538,7 @@ export const PERSISTENCE_CATEGORIES = ['range', 'entities', 'order'];
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
-const _GRAPH_OPTIONS = [...ENTITY_OPTION_KEYS.filter(k => !ENTITY_ONLY_KEYS.includes(k)), 'fill', 'arrowLength', 'arrowMax', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
+const _GRAPH_OPTIONS = [...ENTITY_OPTION_KEYS.filter(k => !ENTITY_ONLY_KEYS.includes(k)), 'fill', 'arrowLength', 'arrowMax', 'arrowWeighting', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'sizePoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
