@@ -1437,22 +1437,20 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── '<' and '>': a screen less a graduation at least, on a graduation; the present a stop ──
+    // ── '<' and '>': the window moved by max(min(90 %, less half a graduation), 80 %); the end a stop ──
     t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
         { mock: { series: true }, clock: '2026-11-19T10:17:00+01:00', timezone: 'Europe/Paris' });
     await t.wait(1500);
-    await t.step('\'<\' and \'>\': the window a screen less a graduation before or after, its end (\'<\') or start (\'>\') on a graduation; \'>\' stops with the end on the right edge, the next one after it, then greyed; \'<\' from after it back to the end on the right edge', async () => {
-        const W = () => t.E(`(()=>{ const I=el.instance, a=+new Date(I.startTime), b=+new Date(I.endTime), c=graphAt(0).chart; return { a, b, P: +I.realTimeEnd(), G: I.graduationMs(), live: !!I.state.autoScroll, greyed: el.querySelector('#b2_0').disabled, endOnTick: c.hecTimeTick(b, 0) === b, startOnTick: c.hecTimeTick(a, 0) === a }; })()`);
+    await t.step('\'<\' and \'>\': the window moved by max(min(90 % of it, it less half a graduation), 80 % of it), nothing set on a graduation; \'>\' stops with the end on the right edge, the next one after it, then greyed; \'<\' from after it back to the end on the right edge', async () => {
+        const W = () => t.E(`(()=>{ const I=el.instance; return { a: +new Date(I.startTime), b: +new Date(I.endTime), P: +I.realTimeEnd(), G: I.graduationMs(), live: !!I.state.autoScroll, greyed: el.querySelector('#b2_0').disabled }; })()`);
         const step = async d => { await t.E(`el.instance.stepDay(${d})`); await t.wait(400); return W(); };
         const w0 = await W(), b1 = await step(-1), b2 = await step(-1), f1 = await step(1), f2 = await step(1), f3 = await step(1), f4 = await step(1), r1 = await step(-1), r2 = await step(-1);
-        const span = w0.b - w0.a, near = (x, y) => Math.abs(x - y) <= 1500;
-        // (back a screen less a graduation at least, on a graduation: less than one more)
-        const back = (p, q) => q.endOnTick && p.b - q.b <= span - p.G + 1 && p.b - q.b >= span - 2 * p.G - 1 && !q.live;
-        const ok = w0.live && !w0.greyed && back(w0, b1) && back(b1, b2)
-            && f1.startOnTick && f1.a > b2.a && near(f2.b, f2.P) && f2.live && !f2.greyed
+        const span = w0.b - w0.a, S = Math.max(Math.min(0.9 * span, span - w0.G / 2), 0.8 * span), near = (x, y) => Math.abs(x - y) <= 1500;
+        const ok = w0.live && !w0.greyed && near(w0.b - b1.b, S) && near(b1.b - b2.b, S) && !b1.live && !b2.live
+            && near(f1.b - b2.b, S) && near(f2.b, f2.P) && f2.live && !f2.greyed
             && near(f3.b, f3.P + f3.G) && f3.live && f3.greyed && near(f4.b, f4.P + f4.G) && f4.greyed
-            && near(r1.b, r1.P) && r1.live && !r1.greyed && back(r1, r2);
-        return ok ? true : JSON.stringify({ w0, b1, b2, f1, f2, f3, f4, r1, r2 });
+            && near(r1.b, r1.P) && r1.live && !r1.greyed && near(r1.b - r2.b, S) && [b1, b2, f1, r2].every(w => near(w.b - w.a, span));
+        return ok ? true : JSON.stringify({ span, S, G: w0.G, w0, b1, b2, f1, f2, f3, f4, r1, r2 });
     });
     done(await t.close());
 

@@ -5,7 +5,7 @@
 import { parseColorValue, parseFillValue, fillValue, NO_FILL, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
 import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED, minMaxBand, INDIRECT_OPTIONS } from "./history-options.js";
-import { timeWeightedMean, circularMean } from "./history-stats.js";
+import { timeWeightedMean, circularMean, wrapDiff } from "./history-stats.js";
 import { perf } from "./card-perf.js";
 import { minOf, maxOf, insertAll } from "./history-arrays.js";
 import { isMissingState } from "./history-units.js";
@@ -1010,13 +1010,20 @@ export class CardDatasets
         const byLen = lenWeight > 0 ? _mean(_withLen, x => x.v, x => _d(x) * Math.abs(x.len)).mean : undefined;
         const _shown = v => P ? Chart.hecCircular.wrap(v, P) : v;
         const statistics = parts.some(x => x.statistics), statisticsPeriod = maxOf(parts.map(x => x.period));
+        // (a circular entity's turn: its values followed in time order, each the shortest way
+        // from the one before — from the first, how far it went each way and where it ended:
+        // the turns of the rows of an arrow's zone joined, a whole turn or more seen, see
+        // deps/timeline.js.md)
+        let u = 0, lo = 0, hi = 0;
+        if( P ) for( let k = 1; k < parts.length; k++ ) { u += wrapDiff(parts[k].v - parts[k - 1].v, P); lo = Math.min(lo, u); hi = Math.max(hi, u); }
+        const turn = P ? { first: _shown(parts[0].v), lo, hi, last: u } : undefined;
         return [parts[0].a, parts[parts.length - 1].b, _shown(m.mean),
                 _withLen.length ? timeWeightedMean(_withLen, x => x.len, x => x.a, x => x.b) : undefined,
                 { lo: m.lo - m.mean, hi: m.hi - m.mean,
                   lenMin: _withLen.length ? minOf(_withLen.map(x => x.len)) : undefined, lenMax: _withLen.length ? maxOf(_withLen.map(x => x.len)) : undefined,
                   span: parts.reduce((s, x) => s + _d(x), 0), lenSpan: _withLen.reduce((s, x) => s + _d(x), 0), lenWeight,
                   byLen: byLen === undefined ? undefined : _shown(byLen),
-                  statistics, ...( statisticsPeriod ? { statisticsPeriod } : {} ), sides: this.bandWanted(e, statistics, 2),
+                  statistics, ...( statisticsPeriod ? { statisticsPeriod } : {} ), sides: this.bandWanted(e, statistics, 2), turn,
                   // (a value alone: which one — its row joined to the next column's when it's alone there too)
                   alone: parts.length === 1 ? parts[0].of : undefined }];
     }

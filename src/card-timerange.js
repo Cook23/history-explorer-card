@@ -16,6 +16,9 @@ const ranges = TIME_RANGES.filter(r => r.step !== false).map(r => r.hours);
 export const TICK_LABEL_GAP_PX = 8;
 // A window ending this close to the end (realTimeEnd) ends there (its end is set to the second)
 const END_MS = 1000;
+// The toolbar's '<' '>' (stepDay): the window moved by STEP_MOST of it at most — less half a
+// graduation —, STEP_LEAST at least
+const STEP_MOST = 0.9, STEP_LEAST = 0.8;
 
 export class CardTimeRange
 {
@@ -129,37 +132,19 @@ export class CardTimeRange
         this.writeLocalState();
     }
 
-    // The toolbar's '<' (dir -1) and '>' (dir 1), the range kept: the window a screen less a
-    // graduation of the time axis at least before or after — its start ('>') or its end ('<')
-    // on a graduation, as Chart.js draws them (hecTimeTick): what was on one edge still on the
-    // other. The end (realTimeEnd) a stop: '>' passing it stops with it on the right edge,
-    // the next one goes after it (a graduation at most, _settleWindow); '<' from after it comes
-    // back with it on the right edge
+    // The toolbar's '<' (dir -1) and '>' (dir 1), the range kept: the window moved by
+    // max(min(90 % of it, it less half a graduation of the time axis), 80 % of it) — some of
+    // what was on one edge still on the other; nothing set on a graduation (Chart.js draws its
+    // own where they fall). The end (realTimeEnd) a stop: '>' passing it stops with it on the
+    // right edge, the next one goes after it (a graduation at most, _settleWindow); '<' from
+    // after it comes back with it on the right edge
     stepDay(dir)
     {
         const t0 = moment(this.startTime).valueOf(), t1 = moment(this.endTime).valueOf(), span = t1 - t0, G = this.graduationMs();
-        const P = this.realTimeEnd().valueOf(), _chart = this.graphs.find(g => g.chart)?.chart;
-        const _tick = (t, n) => _chart ? _chart.hecTimeTick(t, n) : t;
+        const P = this.realTimeEnd().valueOf(), step = Math.max(Math.min(STEP_MOST * span, span - G / 2), STEP_LEAST * span);
         let end;
-        if( dir > 0 ) {
-            if( t1 >= P - END_MS ) end = P + G;
-            else {
-                // (the new start: the graduation at or before a screen less a graduation on —
-                // past the window's start at least)
-                let s = _tick(t0 + span - G, 0);
-                if( s <= t0 ) s = _tick(t0, 1);
-                end = Math.min(s + span, P);
-            }
-        } else {
-            if( t1 > P + END_MS ) end = P;
-            else {
-                // (the new end: the graduation at or after a screen less a graduation back —
-                // before the window's end at least)
-                const x = t1 - span + G, g = _tick(x, 0);
-                end = g >= x ? g : _tick(x, 1);
-                if( end >= t1 ) { const g0 = _tick(t1, 0); end = g0 < t1 ? g0 : _tick(t1, -1); }
-            }
-        }
+        if( dir > 0 ) end = t1 >= P - END_MS ? P + G : Math.min(t1 + step, P);
+        else end = t1 > P + END_MS ? P : t1 - step;
         this._setWindow(moment(end - span), moment(end));
 
         this.updateHistory(true);

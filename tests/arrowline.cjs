@@ -166,16 +166,17 @@ module.exports = async function()
         const rows = (gi, dir, len, sides) => t.E(`(()=>{ const c=graphAt(${gi}).chart, ds=c.data.datasets[0], t0=+new Date(el.instance.startTime), t1=+new Date(el.instance.endTime), n=4000, d=(t1-t0)/n;
             const dir=${dir}, len=${len};
             ds.data=Array.from({ length: n }, (_, k)=>{ const v=dir(k), L=len(k); return [t0+k*d, t0+(k+1)*d, v, L,
-                { lo: 0, hi: 0, lenMin: L, lenMax: L, span: d, lenSpan: L===undefined?0:d, lenWeight: L===undefined?0:d*Math.abs(L), byLen: v, sides: ${JSON.stringify(sides ?? null)} }]; });
+                { lo: 0, hi: 0, lenMin: L, lenMax: L, span: d, lenSpan: L===undefined?0:d, lenWeight: L===undefined?0:d*Math.abs(L), byLen: v, sides: ${JSON.stringify(sides ?? null)}, turn: { first: v, lo: 0, hi: 0, last: 0 } }]; });
             c.update(0); })()`);
         // (the angles its arrows are drawn at; the light sectors drawn: their arcs — centre,
         // radius, angles from and to, the canvas' (0 to the right, clockwise) —, from the arrow's middle)
-        const drawn = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, ctx=c.ctx, r={ a: new Set(), sec: [], style: new Set() }, o={ rotate: ctx.rotate, moveTo: ctx.moveTo, arc: ctx.arc, fill: ctx.fill };
+        const drawn = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, ctx=c.ctx, r={ a: new Set(), sec: [], style: new Set() }, o={ rotate: ctx.rotate, moveTo: ctx.moveTo, arc: ctx.arc, fill: ctx.fill, beginPath: ctx.beginPath };
             let path=[];
             ctx.rotate=function(a){ if(a) r.a.add(Math.round(((a*180/Math.PI-180)%360+360)%360)); return o.rotate.call(this,a); };
             ctx.moveTo=function(x,y){ path=[['m',x,y]]; return o.moveTo.call(this,x,y); };
             ctx.arc=function(...a){ path.push(a); return o.arc.apply(this,a); };
-            ctx.fill=function(...a){ if( !a.length && path.length===2 && path[0][0]==='m' && /0[.]3[)]$/.test(String(this.fillStyle)) ) { r.sec.push(path[1].map(v=>Math.round(v*1000)/1000)); r.style.add(String(this.fillStyle)); } path=[]; return o.fill.apply(this,a); };
+            ctx.fill=function(...a){ const arc=path.find(p=>p.length===5); if( !a.length && arc && path.length<=2 && /0[.]3[)]$/.test(String(this.fillStyle)) ) { r.sec.push(arc.map(v=>Math.round(v*1000)/1000)); r.style.add(String(this.fillStyle)); } path=[]; return o.fill.apply(this,a); };
+            ctx.beginPath=function(){ path=[]; return o.beginPath.call(this); };
             c.render(0); for( const k in o ) delete ctx[k]; return { a: [...r.a], sec: r.sec, style: [...r.style] }; })()`);
         await t.step('an arrow\'s direction: the mean of the rows in its zone, each weighted by how long — 350° and 10° alternating: 0°', async () => {
             await rows(0, 'k=>k%2?10:350', 'k=>undefined');
@@ -212,6 +213,12 @@ module.exports = async function()
             // (from the arrow's middle: its foot at hypot(x, y); the band 30 px high)
             const over = r.sec.filter(x => x[2] > 15 + Math.hypot(x[0], x[1]) + 0.01);
             return r.sec.length > 5 && !over.length ? true : JSON.stringify({ n: r.sec.length, over: over.slice(0, 3) });
+        });
+        await t.step('a whole turn or more in an arrow\'s zone (10° more each row): the extremes a whole disc about the arrow\'s middle, within the band; the arrow still its mean direction', async () => {
+            await rows(3, 'k=>(k*10)%360', 'k=>undefined', { min: true, max: true });
+            const r = await drawn(3);
+            const discs = r.sec.filter(x => Math.abs(x[3]) < 1e-3 && Math.abs(x[4] - 2 * Math.PI) < 1e-3 && x[0] === 0 && x[1] === 0 && x[2] <= 15);
+            return discs.length > 5 && r.a.length > 0 ? true : JSON.stringify({ discs: discs.length, sec: r.sec.slice(0, 2), a: r.a.length });
         });
         await t.step('extremes from the YAML (showMinMax: true) on real values: sectors drawn where the values vary in an arrow\'s zone', async () => {
             const r = await drawn(4);
