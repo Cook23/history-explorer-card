@@ -4,6 +4,24 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.89] - 2026-11-19
+
+### Changed
+- An arrowline's extremes (`showMinMax`): a light sector of a disc on each side of the arrow (before: a triangle), its radius its zone's longest length — at most from the foot of an upright arrow as long to the row's top: never past the row —; a whole disc about the arrow's middle where the direction turned a whole turn or more in its zone (before: a triangle on each side, at random)
+- An arrowline's arrows 1.7 times as long at their whole length — about 80 % of the row's height (before: under half) —, their head unchanged
+- An arrowline's length from an entity: its automatic scale worked out on the entity's means over an arrow's zone, as the arrows show it — the longest arrow at its whole length, or nearly (before: on its raw values, rounder ones on top — the arrows, means, all short)
+- The toolbar's `<` `>`: the window moved back or forward by max(min(90 % of it, it less half a graduation of the time axis), 80 % of it) — 10 % to 20 % of it still shown —, its start then on the roundest time nearest that keeps the move within 80 % to 90 % (a month's first, a Monday, midnight, an hour, ten minutes, a minute — the coarsest the window's length allows, a finer one when none fits), the range kept (before: a day, from midnight; a range under a day made a day); `>` passing the end, or leaving it less than 20 % of the window ahead, stops with it on the right edge, the next one goes a graduation past it; from there `<` comes back to the end on the right edge
+
+### Docs
+- README_Full.md, full-reference-config.yaml: an arrowline's extremes as sectors, the arrows' length and its scale; `<` and `>`
+- README.md, README_Full.md, full-reference-config.yaml: `realTimeStep`'s end — where the window ends in real time — told apart from the present, now
+
+### Internal
+- `arrowSpacing`, the room between two arrows, given by the card; a row's `turn`, how far its direction went each way (`deps/timeline.js.md`)
+- The time window's end in real time named so in the code: `realTimeEnd()`, `endAnchor()`, `setEndWindow()`, `END_MS`, `_keepsEnd()` (were `presentTime()`, `presentAnchor()`, `setPresentWindow()`, `PRESENT_MS`, `_keepsPresent()` — the end, not the present, with `realTimeStep`)
+- Tests (`features`, `panel`, `mouse`): `<` and `>` — the step, its start on a round time, the end a stop; (`values`, `features`): `<` no longer a day; (`arrowline`): the sectors and their radius within the row, a whole turn's disc, the length's scale on the zone means
+
+
 ## [v1.2.88] - 2026-11-19
 
 ### Fixed

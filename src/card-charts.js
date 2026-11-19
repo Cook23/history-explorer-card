@@ -857,6 +857,13 @@ export class CardCharts
         return !_oneDay && !['minute', 'hour'].includes(this.timeTickStep()[1]);
     }
 
+    // The time axis' step Chart.js drew with let go: the one asked until it draws again
+    // (timeTickStep — a range set, see setStepSize)
+    timeTicksAsked()
+    {
+        this._timeTickApplied = undefined;
+    }
+
     // An element's value in its tooltip: a curve's or a bar's in its unit (circular ones in
     // [0, period); a column of values: their min / mean / max — see _lineSamples), a
     // timeline's state (named as Home Assistant names it: tooltip.stateTextMode auto), an

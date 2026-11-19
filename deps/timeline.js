@@ -741,15 +741,16 @@ var ArrowlineScale = Chart.scaleService.getScaleConstructor('time').extend({
 
 // An arrowline's arrow: its outline in a box ARROW_BOX px square, pointing up (rotated to
 // its direction about the box's middle, scaled there to its length); a point of
-// ARROW_POINT_RADIUS for no length
-const ARROW_BOX = 24, ARROW_POINT_RADIUS = 1.5;
-const ARROW_PATH = typeof Path2D !== 'undefined' ? new Path2D('M7.03 9.97H11.03V18.89L13.04 18.92V9.97H17.03L12.03 4.97Z') : null;
-// (the same arrow in two parts — drawn so when its shaft is dashed: its head; its shaft, from
-// the head's base to its end, as wide)
-const ARROW_HEAD = typeof Path2D !== 'undefined' ? new Path2D('M7.03 9.97H17.03L12.03 4.97Z') : null;
-const ARROW_SHAFT = [9.97, 18.9], ARROW_SHAFT_WIDTH = 2;
-// (its tip, in its box: the far end of its length from its base, ARROW_SHAFT[1])
-const ARROW_TIP = 4.97;
+// ARROW_POINT_RADIUS for no length. Its whole length ARROW_LENGTH_FACTOR times its head and
+// shaft's first one (13.93 px), its head as it was — 10 px wide, 5 px long —, centred in its box
+const ARROW_BOX = 24, ARROW_POINT_RADIUS = 1.5, ARROW_LENGTH_FACTOR = 1.7;
+const ARROW_LENGTH = 13.93 * ARROW_LENGTH_FACTOR;
+// (its tip, in its box; its shaft, from the head's base to its end — its base —, its width)
+const ARROW_TIP = ( ARROW_BOX - ARROW_LENGTH ) / 2;
+const ARROW_SHAFT = [ARROW_TIP + 5, ARROW_TIP + ARROW_LENGTH], ARROW_SHAFT_WIDTH = 2;
+const ARROW_PATH = typeof Path2D !== 'undefined' ? new Path2D(`M7.03 ${ARROW_SHAFT[0]}H11.03V${ARROW_SHAFT[1]}H13.04V${ARROW_SHAFT[0]}H17.03L12.03 ${ARROW_TIP}Z`) : null;
+// (the same arrow in two parts — drawn so when its shaft is dashed: its head; its shaft)
+const ARROW_HEAD = typeof Path2D !== 'undefined' ? new Path2D(`M7.03 ${ARROW_SHAFT[0]}H17.03L12.03 ${ARROW_TIP}Z`) : null;
 
 Chart.scaleService.registerScaleType('arrowline', ArrowlineScale, ArrowlineConfig);
 
@@ -919,7 +920,9 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
         const ctx = this.chart.ctx;
         const area = this.chart.chartArea;
 
-        const arrow_spacing = 30;
+        // (the room between two arrows: the dataset's arrowSpacing, the card's — each arrow the
+        // mean of that zone)
+        const arrow_spacing = ds.arrowSpacing;
 
         const n = Math.ceil((area.right - area.left) / arrow_spacing);
 
@@ -1015,8 +1018,8 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
             ctx.translate(xmid, ybar);
 
             // (its extremes — the rows' sides, showMinMax: see deps/timeline.js.md —: from its
-            // base, a triangle on each side asked, to the lowest — anticlockwise, min — and the
-            // highest direction — clockwise, max — around its own, as long as its longest
+            // base, a sector of a disc on each side asked, to the lowest — anticlockwise, min —
+            // and the highest direction — clockwise, max — around its own, its radius its longest
             // length there, in its color at Chart.hecMinMaxBandAlpha)
             let lo = 0, hi = 0;
             for( const it of items ) {
@@ -1024,18 +1027,43 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
                 if( sides?.min ) lo = Math.min(lo, _diff(it.r[2] + it.r[4].lo - value));
                 if( sides?.max ) hi = Math.max(hi, _diff(it.r[2] + it.r[4].hi - value));
             }
-            const reach = ( ARROW_SHAFT[1] - ARROW_TIP ) * lengthOf(_max).k;
-            if( ( lo < 0 || hi > 0 ) && reach > 0 && k > 0 ) {
-                const a = _angle(value), base = ( ARROW_SHAFT[1] - ARROW_BOX / 2 ) * k;
+            // (a whole turn or more in its zone — its rows' turns joined in time order, each from
+            // where the one before ended, the shortest way —: every direction, a whole disc)
+            let _whole = false;
+            if( P && items.some(it => it.r[4].sides) ) {
+                let U = null, prev = 0, lowest = 0, highest = 0;
+                for( const it of items ) {
+                    const tr = it.r[4].turn;
+                    if( !tr ) continue;
+                    const at = U === null ? 0 : U + wrapDiff(tr.first - prev, P);
+                    lowest = Math.min(lowest, at + tr.lo); highest = Math.max(highest, at + tr.hi);
+                    U = at + tr.last; prev = Chart.hecCircular.wrap(tr.first + tr.last, P);
+                }
+                _whole = highest - lowest >= P;
+            }
+            // (its radius within the band: at most from the foot of an upright arrow as long as
+            // this one — its base, half its length below the middle — to the band's top, half
+            // its height above: the same whatever its direction)
+            const base = ( ARROW_SHAFT[1] - ARROW_BOX / 2 ) * k;
+            const reach = Math.min(( ARROW_SHAFT[1] - ARROW_TIP ) * lengthOf(_max).k, ( ARROW_BOX + 6 ) / 2 + base);
+            if( _whole && reach > 0 ) {
+                // (a whole disc about the arrow's middle — no side to start from —, within the band)
+                ctx.fillStyle = _color(color).alpha(Chart.hecMinMaxBandAlpha).rgbString();
+                ctx.beginPath();
+                ctx.arc(0, 0, Math.min(reach, ( ARROW_BOX + 6 ) / 2), 0, 2 * Math.PI);
+                ctx.fill();
+            } else if( ( lo < 0 || hi > 0 ) && reach > 0 && k > 0 ) {
+                const a = _angle(value);
                 const bx = -Math.sin(a) * base, by = Math.cos(a) * base;
-                const _to = v => [bx + Math.sin(_angle(v)) * reach, by - Math.cos(_angle(v)) * reach];
+                // (a direction's angle on the canvas: 0 to the right, clockwise — the arrow's
+                // pointing up turned by _angle)
+                const _canvas = v => _angle(v) - Math.PI / 2;
                 ctx.fillStyle = _color(color).alpha(Chart.hecMinMaxBandAlpha).rgbString();
                 for( const [p, q] of [[value + lo, value], [value, value + hi]] ) {
                     if( p === q ) continue;
                     ctx.beginPath();
                     ctx.moveTo(bx, by);
-                    ctx.lineTo(..._to(p));
-                    ctx.lineTo(..._to(q));
+                    ctx.arc(bx, by, reach, _canvas(p), _canvas(q));
                     ctx.closePath();
                     ctx.fill();
                 }

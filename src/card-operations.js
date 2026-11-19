@@ -557,7 +557,7 @@ export class CardOperations
         this.store.reset(JSON.parse(JSON.stringify(this._pureYamlEntities ?? [])));
         this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
         this.setZoomBoxMode(this.pconfig.defaultMagnifierMode, false);
-        this.setPresentWindow();
+        this.setEndWindow();
         this.buildGraphsFromStore();
         this.refreshGraphControls();
         this.updateHistory();
@@ -570,7 +570,7 @@ export class CardOperations
     {
         this.removeGraphs([...this.graphs]);
         this.refreshOptionsMenus();
-        this.setPresentWindow();
+        this.setEndWindow();
         this.buildGraphsFromStore();
         this.refreshGraphControls();
         this.reloadHistory();

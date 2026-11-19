@@ -1437,6 +1437,25 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── '<' and '>': the window moved by max(min(90 %, less half a graduation), 80 %); the end a stop ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { series: true }, clock: '2026-11-19T10:17:00+01:00', timezone: 'Europe/Paris' });
+    await t.wait(1500);
+    await t.step('\'<\' and \'>\': the window moved by 80 % to 90 % of it — max(min(90 %, less half a graduation), 80 %) —, its start on the roundest time nearest that keeps it so (an hour, for a day); \'>\' stops with the end on the right edge, the next one after it, then greyed; \'<\' from after it back to the end on the right edge', async () => {
+        const W = () => t.E(`(()=>{ const I=el.instance; return { a: +new Date(I.startTime), b: +new Date(I.endTime), P: +I.realTimeEnd(), G: I.graduationMs(), live: !!I.state.autoScroll, greyed: el.querySelector('#b2_0').disabled, hour: new Date(I.startTime).getMinutes() === 0 && new Date(I.startTime).getSeconds() === 0 }; })()`);
+        const step = async d => { await t.E(`el.instance.stepDay(${d})`); await t.wait(400); return W(); };
+        const w0 = await W(), b1 = await step(-1), b2 = await step(-1), f1 = await step(1), f2 = await step(1), f3 = await step(1), f4 = await step(1), r1 = await step(-1), r2 = await step(-1);
+        const span = w0.b - w0.a, near = (x, y) => Math.abs(x - y) <= 1500;
+        // (a move of 80 % to 90 % of the window, its start on an hour — the roundest time a day's window allows there)
+        const S = d => d >= 0.8 * span - 1000 && d <= 0.9 * span + 1000;
+        const ok = w0.live && !w0.greyed && S(w0.b - b1.b) && S(b1.b - b2.b) && !b1.live && !b2.live && b1.hour && b2.hour && f1.hour
+            && S(f1.b - b2.b) && near(f2.b, f2.P) && f2.live && !f2.greyed
+            && near(f3.b, f3.P + f3.G) && f3.live && f3.greyed && near(f4.b, f4.P + f4.G) && f4.greyed
+            && near(r1.b, r1.P) && r1.live && !r1.greyed && S(r1.b - r2.b) && r2.hour && [b1, b2, f1, r2].every(w => near(w.b - w.a, span));
+        return ok ? true : JSON.stringify({ span, G: w0.G, w0, b1, b2, f1, f2, f3, f4, r1, r2 });
+    });
+    done(await t.close());
+
     // ── Midnight, in the browser's time zone (Paris: a day starting 2 h before UTC's) ──
     {
         const now = Date.parse('2026-10-19T18:19:00+02:00') / 1000, ago = iso => now - Date.parse(iso) / 1000;
@@ -1863,9 +1882,10 @@ module.exports = async function()
             return __ws.slice(n0).filter(w => w.period === 'hour' && Date.parse(w.end) > from).map(w => [w.start, w.end]); })()`);
         return r.length === 0 ? true : JSON.stringify(r);
     });
-    await t.step('the window moved back (<): the hourly statistics of the side — a short part, the same for all — in one request for the three entities', async () => {
+    await t.step('the window moved back a day: the hourly statistics of the side — a short part, the same for all — in one request for the three entities', async () => {
         const n0 = await t.E('__ws.length');
-        await t.E(`el.querySelector('#b1_0').click()`); await t.wait(3000);
+        // (a day: the side beyond the history kept — '<' moves a screen less a graduation)
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) - 86400e3))`); await t.wait(3000);
         const r = await t.E(`__ws.slice(${n0}).filter(w => w.period === 'hour').map(w => [w.start, w.end, w.ids.length])`);
         return r.length >= 1 && r.every(w => w[2] === 3) ? true : JSON.stringify(r);
     });

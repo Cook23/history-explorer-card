@@ -5,7 +5,7 @@
 import { parseColorValue, parseFillValue, fillValue, NO_FILL, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
 import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED, minMaxBand, INDIRECT_OPTIONS } from "./history-options.js";
-import { timeWeightedMean, circularMean } from "./history-stats.js";
+import { timeWeightedMean, circularMean, wrapDiff } from "./history-stats.js";
 import { perf } from "./card-perf.js";
 import { minOf, maxOf, insertAll } from "./history-arrays.js";
 import { isMissingState } from "./history-units.js";
@@ -15,6 +15,9 @@ import { keyOf } from "./history-entity-store.js";
 // The steadiness of the scale of an arrowline's arrows' length (see arrowLengthMax): as the
 // automatic Y axis' yScaleSteadiness, its default — fixed
 const ARROW_SCALE_STEADY = 0.5;
+// The room between two arrows of an arrowline, in px — each arrow the mean of that zone
+// (Chart.js, deps/timeline.js: the dataset's arrowSpacing; the length's scale, arrowLengthMax)
+const ARROW_SPACING_PX = 30;
 
 // (the functions of a group other than its mean — see _aggregate)
 const AGGREGATES_NOT_MEAN = new Set(['min', 'max', 'first', 'last', 'sum', 'delta', 'diff', 'median']);
@@ -358,6 +361,7 @@ export class CardDatasets
                         s = this._arrowColumns(e, result[id], process, w, g.chart.hecPlotWidth(), _len);
                         _dataset.arrowLength = _len?.drawn;
                         _dataset.arrowWeighting = this.resolveOption(e, 'arrowWeighting');
+                        _dataset.arrowSpacing = ARROW_SPACING_PX;
                         Object.assign(_dataset, this._arrowColors(e, s, colorHistory));
                     }
 
@@ -823,6 +827,32 @@ export class CardDatasets
         return { drawn, at, times: _times };
     }
 
+    // The means of a series' rows (in time order; each value lasting until the next one, the
+    // last one until now) by zones Z ms long on a grid of time fixed from 1970, each value
+    // weighted by how long it lasts in the zone (one lasting no time: nothing, as timeWeightedMean) → [{ t: the zone's start, mean }], the zones
+    // holding a value only
+    _zoneMeans(rows, Z)
+    {
+        const out = [], _until = Date.now();
+        let k0 = null, sum = 0, span = 0;
+        const _flush = () => { if( span > 0 ) out.push({ t: k0 * Z, mean: sum / span }); sum = 0; span = 0; };
+        for( let i = 0; i < rows.length; i++ ) {
+            const v = Number(rows[i].state);
+            if( rows[i].state === '' || rows[i].state === null || !Number.isFinite(v) ) continue;
+            const a = msOf(rows[i].last_changed), b = i + 1 < rows.length ? msOf(rows[i + 1].last_changed) : Math.max(a, _until);
+            for( let t = a; t < b; ) {
+                let k = Math.floor(t / Z);
+                if( ( k + 1 ) * Z <= t ) k++;
+                const e = Math.min(b, ( k + 1 ) * Z);
+                if( k !== k0 ) { _flush(); k0 = k; }
+                sum += v * ( e - t ); span += e - t;
+                t = e;
+            }
+        }
+        _flush();
+        return out;
+    }
+
     // An arrowline's arrows' colors and backgrounds, each block's (its rows s, [start, end,
     // state]: at its middle, for its value — as a curve's points', see _optionFunction): the
     // dataset's arrowColors and arrowBackgrounds (deps/timeline.js.md) — each undefined when
@@ -873,19 +903,19 @@ export class CardDatasets
     // The value of series id giving entity e's arrows (of graph g) their whole length: arrowMax
     // set — a number —, that one; else chosen as the automatic Y axis chooses its top (see
     // card-yscale.js chooseYAxis: what is shown first, a steady scale second, at
-    // ARROW_SCALE_STEADY), from the absolute values of the series over the time window and
-    // around it (history: the series' history, by id), 0 at the bottom; a soft arrowMax
-    // (~value) reached at least. Kept for the next update, by graph and curve
+    // ARROW_SCALE_STEADY), from the series over the time window and around it (history: the
+    // series' history, by id) as the arrows show it: its means by the time of an arrow's zone
+    // (ARROW_SPACING_PX of the plot — on a grid of time fixed from 1970 —, each value weighted by
+    // how long it lasts there), their absolute values — the longest arrow at its whole length,
+    // or nearly —, 0 at the bottom; a soft arrowMax (~value) reached at least. Kept for the next
+    // update, by graph and curve
     arrowLengthMax(g, e, id, history)
     {
         const M = this.resolveOption(e, 'arrowMax');
         if( typeof M === 'number' ) return Math.abs(M);
         const _soft = M?.soft !== undefined ? Math.abs(M.soft) : undefined;
-        const entries = [];
-        for( const p of history?.[id] ?? [] ) {
-            const v = Number(p.state);
-            if( p.state !== '' && p.state !== null && Number.isFinite(v) ) entries.push({ x: msOf(p.last_changed), lo: 0, hi: Math.abs(v) });
-        }
+        const Z = ARROW_SPACING_PX * ( msOf(this.endTime) - msOf(this.startTime) ) / Math.max(1, g.chart.hecPlotWidth());
+        const entries = this._zoneMeans(history?.[id] ?? [], Z).map(({ t, mean }) => ({ x: t, lo: 0, hi: Math.abs(mean) }));
         const _index = rangeIndex([entries]);
         const rangeOf = (t0, t1) => {
             const r = _index(t0, t1);
@@ -980,13 +1010,20 @@ export class CardDatasets
         const byLen = lenWeight > 0 ? _mean(_withLen, x => x.v, x => _d(x) * Math.abs(x.len)).mean : undefined;
         const _shown = v => P ? Chart.hecCircular.wrap(v, P) : v;
         const statistics = parts.some(x => x.statistics), statisticsPeriod = maxOf(parts.map(x => x.period));
+        // (a circular entity's turn: its values followed in time order, each the shortest way
+        // from the one before — from the first, how far it went each way and where it ended:
+        // the turns of the rows of an arrow's zone joined, a whole turn or more seen, see
+        // deps/timeline.js.md)
+        let u = 0, lo = 0, hi = 0;
+        if( P ) for( let k = 1; k < parts.length; k++ ) { u += wrapDiff(parts[k].v - parts[k - 1].v, P); lo = Math.min(lo, u); hi = Math.max(hi, u); }
+        const turn = P ? { first: _shown(parts[0].v), lo, hi, last: u } : undefined;
         return [parts[0].a, parts[parts.length - 1].b, _shown(m.mean),
                 _withLen.length ? timeWeightedMean(_withLen, x => x.len, x => x.a, x => x.b) : undefined,
                 { lo: m.lo - m.mean, hi: m.hi - m.mean,
                   lenMin: _withLen.length ? minOf(_withLen.map(x => x.len)) : undefined, lenMax: _withLen.length ? maxOf(_withLen.map(x => x.len)) : undefined,
                   span: parts.reduce((s, x) => s + _d(x), 0), lenSpan: _withLen.reduce((s, x) => s + _d(x), 0), lenWeight,
                   byLen: byLen === undefined ? undefined : _shown(byLen),
-                  statistics, ...( statisticsPeriod ? { statisticsPeriod } : {} ), sides: this.bandWanted(e, statistics, 2),
+                  statistics, ...( statisticsPeriod ? { statisticsPeriod } : {} ), sides: this.bandWanted(e, statistics, 2), turn,
                   // (a value alone: which one — its row joined to the next column's when it's alone there too)
                   alone: parts.length === 1 ? parts[0].of : undefined }];
     }

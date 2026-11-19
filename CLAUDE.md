@@ -111,6 +111,10 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
   read the code it's about: a question its code answers (what `<` / `>` do, what Chart.js
   already gives the card…) is not asked — what it does is said, with the line. Only what the
   code can't tell is asked: the user's choice.
+- **A name proves nothing.** A function's, a variable's or an option's name is not what it
+  does: read its code before drawing anything from it — a misleading name steers the reading
+  of the code it's in (`presentTime()` gave the end, not the present). A misleading name
+  found: say it and propose to rename it.
 - **An instruction unclear:** reformulate it and wait for the answer — don't interpret.
 - **An instruction too summarized** to be coded as is: say so and ask the user to detail it, before
   coding.
