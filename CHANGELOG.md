@@ -19,6 +19,7 @@ Changelog for the HA History Explorer Card.
 
 ### Internal
 - `deps/timeline.js` imports `src/history-stats.js` (the one rule of means), documented in `deps/Chart Custom.js.md` (the contract) and `deps/timeline.js.md`; `tests/architecture.cjs`: Chart.js imports nothing of the card but it (`chart-imports`)
+- Tests (`documented`): `defaultTimeOffset` in the browser — loaded, dragged towards the future and back from the past, a new value: the window ending an hour after now, the curve stopping at now
 - Tests (`arrowline`): a row a column, a value alone over several columns; each arrow the mean of its zone, weighted by its length or not; the extremes' triangles, their sides; *Appearance ▸ Extremes* on an arrowline
 
 
