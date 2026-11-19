@@ -233,6 +233,7 @@ const EXCEPTIONS = [
     ['store', 'src/history-explorer-card.js', 'pconfig.entities             =', 'the card creates the list the store then manages'],
     ['chart-redraw', 'src/card-charts.js', 'g.chart.update(duration)', "redrawChart itself: the one place a chart is drawn again"],
     ['stored-keys', 'src/card-storage.js', "removeItem('history-explorer-card')", "an old version's key (one for every card): let go, never written"],
+    ['graph-gestures', 'src/history-explorer-card.js', 'addEventListener(', "the card's background's fade when the theme switches (transitionend): no gesture — its colors read again once it's over"],
     ['graph-gestures', 'src/card-gestures.js', 'addEventListener(', 'a mode (the cut, the magnifier): a press anywhere on the page or Escape ends it — the page, not a graph (listenOutsideGraphs)'],
     ['datasets', 'src/card-values.js', 'chart.data.datasets', "the values read a curve's own data there (its unit, its scale, its period, its color, hidden), never change it"],
     ['rendering', 'src/card-toolbar.js', 'getComputedStyle', "the toolbar's own layout"],

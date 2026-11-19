@@ -29,7 +29,7 @@ export function timeButtonsHtml(i)
         `<button id="b1_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold"><</button>` +
         `<button id="bx_${i}" style="${BUTTON_STYLE};height:30px;padding:1px 5px">-</button>` +
         `<button id="b2_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold;position:relative">` +
-            `<span id="rt_${i}" style="position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;pointer-events:none;display:none;animation:hec-turn 1.2s linear infinite">${realTimeSvg(20)}</span>` +
+            `<span id="rt_${i}" style="position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;pointer-events:none;display:none;animation:hec-turn 2s linear infinite">${realTimeSvg(20)}</span>` +
             `<span id="ra_${i}" style="position:relative">></span></button>`;
 }
 

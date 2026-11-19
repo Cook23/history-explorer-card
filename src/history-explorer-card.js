@@ -221,6 +221,12 @@ export class HistoryCardState {
                 this.insertUIHtmlText(i);
 
             this.applyTheme(this._darkBackground());
+            // (the card's background changing in a fade when the theme switches — Home
+            // Assistant's ha-card: transition all 0.3 s —: read again once at its color, the
+            // frame after the switch finding it still dark, see followTheme)
+            this._this.querySelector('#maincard')?.addEventListener('transitionend', e => {
+                if( e.target.id === 'maincard' && /background/.test(e.propertyName) && this.contentValid ) this.followTheme(this._darkBackground());
+            });
 
             this.clearGraphs();
 
