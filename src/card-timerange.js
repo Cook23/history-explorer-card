@@ -149,9 +149,13 @@ export class CardTimeRange
     {
         const t0 = moment(this.startTime).valueOf(), t1 = moment(this.endTime).valueOf(), span = t1 - t0, G = this.graduationMs();
         const P = this.realTimeEnd().valueOf(), step = Math.max(Math.min(STEP_MOST * span, span - G / 2), STEP_LEAST * span);
+        // (at the end: the end on screen — real time, state.autoScroll —, as the window was last
+        // set — its real time's moves too, see updateHistoryAutoRefresh: never against now, the
+        // window's end behind it until the next one —; after it, the time shown after it,
+        // state.realTimeGap)
         let end;
-        if( dir > 0 && t1 >= P - END_MS ) end = P + G;
-        else if( dir < 0 && t1 > P + END_MS ) end = P;
+        if( dir > 0 && this.state.autoScroll ) end = P + G;
+        else if( dir < 0 && this.state.autoScroll && this.state.realTimeGap > END_MS ) end = P;
         else {
             const start = this._roundStart(t0 + dir * step, span, t0, dir);
             // ('>' leaving the end less than what stays shown — 1 - STEP_LEAST of the window — before
