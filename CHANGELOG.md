@@ -11,7 +11,7 @@ Changelog for the HA History Explorer Card.
 - The mean of an angle — a column of pixels, the average over a graph (`showStats`), an arrowline's arrow — Home Assistant's circular mean, as its statistics of a `measurement_angle`: the direction of the sum of unit vectors, each weighted by how long it lasted (before: lowpass_dt's, the mean by the shortest-way differences — with several solutions when the values are spread, and not the same as Home Assistant's statistics); its min and max still the largest differences to it each way
 
 ### Docs
-- README_Full.md: Home Assistant's statistics of an angle wrong only when its state class isn't `measurement_angle`; the mean of an angle, Home Assistant's
+- README_Full.md: Home Assistant's statistics of an angle wrong only when its state class isn't `measurement_angle`; the mean of an angle, Home Assistant's and lowpass_dt's
 - `deps/timeline.js.md`, `deps/Chart Custom.js.md`: an angle's mean, Home Assistant's circular one
 
 ### Internal

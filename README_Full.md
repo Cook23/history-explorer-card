@@ -1302,7 +1302,7 @@ On an arrowline, `circular` sets what a full turn of the arrows is: with `circul
 - **Within the history's retention** — an angle is loaded as any other curve (see [Long term statistics](#long-term-statistics)); when the window is drawn from the statistics, its history over the window is asked first of what is loaded in the background (one request at a time, with the same pause after each one), from the right, and drawn as it comes — the history's values in a column of pixels giving its mean, min and max;
 - **Past it** — the angle is drawn from the statistics.
 
-The mean of an angle — a column of pixels, the average over a graph (`showStats`) — is the same as Home Assistant's statistics of an angle (state class `measurement_angle`): each value a unit vector at its angle, counting for as long as it lasted, the mean the direction of their sum (the mean of 350° and 10° is 0°); a column's min and max are the mean plus the largest differences to it each way, the shortest way round.
+The mean of an angle — a column of pixels, the average over a graph (`showStats`) — is the same as Home Assistant's statistics of an angle (state class `measurement_angle`) and the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration's: each value a unit vector at its angle, counting for as long as it lasted, the mean the direction of their sum (the mean of 350° and 10° is 0°); a column's min and max are the mean plus the largest differences to it each way, the shortest way round.
 
 #### Line stroke style
 

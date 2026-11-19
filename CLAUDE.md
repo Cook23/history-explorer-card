@@ -675,7 +675,7 @@ Decided by the user about the silence detection:
 
 | card 1.2 | Home Assistant | lowpass_dt |
 |---|---|---|
-| every mean of an angle: a column's point and its min/max (`card-datasets.js`), the average over a graph (`showStats`), an arrowline's arrow (`deps/timeline.js`), the turn an angle's curve is shown in (`card-datasets.js` `_unwrapCircular`, given to `Chart.hecCircular.place`, which works out none) — the one rule in `history-stats.js` `circularMean` | `sensor/recorder.py` `_time_weighted_circular_mean`, `recorder/statistics.py` `weighted_circular_mean` (its statistics of a `measurement_angle`) | `filter.py` `update_from_source` — told by the user, its own session |
+| every mean of an angle: a column's point and its min/max (`card-datasets.js`), the average over a graph (`showStats`), an arrowline's arrow (`deps/timeline.js`), the turn an angle's curve is shown in (`card-datasets.js` `_unwrapCircular`, given to `Chart.hecCircular.place`, which works out none) — the one rule in `history-stats.js` `circularMean` | `sensor/recorder.py` `_time_weighted_circular_mean`, `recorder/statistics.py` `weighted_circular_mean` (its statistics of a `measurement_angle`) | `filter.py` `update_from_source` — the same rule (its weights its EMA's: each value's duration times exp(−age / tau)), checked by its session against Home Assistant's `weighted_circular_mean` |
 
 Home Assistant's circular mean is the one to use (set by the user, 1.2.91: it replaced
 lowpass_dt's shortest-way mean, `Σ w · wrap(x − m) = 0` — a mean with several solutions when
