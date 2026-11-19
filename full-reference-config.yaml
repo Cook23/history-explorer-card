@@ -56,7 +56,7 @@ graphs:
       # or, as 'color', thresholds giving one (on the value, or with `entity:` on that entity's), or an entity holding one
       fill: null
 
-      # An arrowline's arrows' length: not set, their whole length; 0 to 100, that part of it (%); thresholds giving one, as 'color';
+      # An arrowline's arrows' length: not set, 80 % of their whole length; 0 to 100, that part of it (%); thresholds giving one, as 'color';
       # an entity (or attribute) whose value gives it, its scale automatic (its largest value around the window: the whole length)
       arrowLength: null
 

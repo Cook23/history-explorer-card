@@ -744,6 +744,9 @@ var ArrowlineScale = Chart.scaleService.getScaleConstructor('time').extend({
 // ARROW_POINT_RADIUS for no length. Its whole length ARROW_LENGTH_FACTOR times its head and
 // shaft's first one (13.93 px), its head as it was — 10 px wide, 5 px long —, centred in its box
 const ARROW_BOX = 24, ARROW_POINT_RADIUS = 1.5, ARROW_LENGTH_FACTOR = 1.7;
+// (an arrow whose length isn't given — no arrowLength, or its entity without a value there —:
+// that part of its whole length, its extremes' sectors and whole disc that part of theirs)
+const ARROW_NO_LENGTH = 0.8;
 const ARROW_LENGTH = 13.93 * ARROW_LENGTH_FACTOR;
 // (its tip, in its box; its shaft, from the head's base to its end — its base —, its width)
 const ARROW_TIP = ( ARROW_BOX - ARROW_LENGTH ) / 2;
@@ -960,12 +963,12 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
         let ofs = xp % arrow_spacing;
 
         // (its arrows' length — the dataset's arrowLength, see deps/timeline.js.md: none, every
-        // arrow its whole length; { fraction }, every arrow that part of it; { max }, a length x
-        // over max — its absolute value, at most the whole length; max 0, a point —, none
-        // (undefined) its whole length, its shaft dashed)
+        // arrow ARROW_NO_LENGTH of its whole length; { fraction }, every arrow that part of it;
+        // { max }, a length x over max — its absolute value, at most the whole length; max 0, a
+        // point —, none (undefined) ARROW_NO_LENGTH of it, its shaft dashed; none: no length given)
         const L = ds?.arrowLength;
-        const lengthOf = x => !L ? { k: 1 } : L.fraction !== undefined ? { k: L.fraction }
-            : x === undefined ? { k: 1, dashed: true } : { k: L.max > 0 ? Math.min(1, Math.abs(x) / L.max) : 0 };
+        const lengthOf = x => !L ? { k: ARROW_NO_LENGTH, none: true } : L.fraction !== undefined ? { k: L.fraction }
+            : x === undefined ? { k: ARROW_NO_LENGTH, none: true, dashed: true } : { k: L.max > 0 ? Math.min(1, Math.abs(x) / L.max) : 0 };
         // (a full turn is the dataset's arrowPeriod — the entity's circular period, else the
         // card's default one — so an angle in radians or grads points the right way too)
         const _angle = v => ( v / ds.arrowPeriod * 360 + 180 ) / 180.0 * Math.PI;
@@ -1011,7 +1014,7 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
             const _lenMean = _known.length ? timeWeightedMean(_known, it => it.r[3], () => 0, it => it.f * it.r[4].lenSpan) : undefined;
             const _max = _known.length ? _known.reduce((m, it) => Math.max(m, it.r[4].lenMax), -Infinity) : undefined;
 
-            const { k, dashed } = lengthOf(_lenMean);
+            const { k, dashed, none } = lengthOf(_lenMean);
             // (its color: the row's under its middle — the dataset's arrowColors —, else the dataset's)
             const color = ds?.arrowColors?.[at] ?? arrowColor;
             ctx.setTransform(origMatrix);
@@ -1046,11 +1049,22 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
             // its height above: the same whatever its direction)
             const base = ( ARROW_SHAFT[1] - ARROW_BOX / 2 ) * k;
             const reach = Math.min(( ARROW_SHAFT[1] - ARROW_TIP ) * lengthOf(_max).k, ( ARROW_BOX + 6 ) / 2 + base);
+            // (the extremes cut at the chart's area — the arrow itself not)
+            const _clipped = ( _whole || lo < 0 || hi > 0 ) && reach > 0;
+            if( _clipped ) {
+                ctx.save();
+                ctx.setTransform(origMatrix);
+                ctx.beginPath();
+                ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+                ctx.clip();
+                ctx.translate(xmid, ybar);
+            }
             if( _whole && reach > 0 ) {
-                // (a whole disc about the arrow's middle — no side to start from —, within the band)
+                // (a whole disc about the arrow's middle — no side to start from —, within the
+                // band; ARROW_NO_LENGTH of that with no length given)
                 ctx.fillStyle = _color(color).alpha(Chart.hecMinMaxBandAlpha).rgbString();
                 ctx.beginPath();
-                ctx.arc(0, 0, Math.min(reach, ( ARROW_BOX + 6 ) / 2), 0, 2 * Math.PI);
+                ctx.arc(0, 0, Math.min(reach, ( ARROW_BOX + 6 ) / 2) * ( none ? ARROW_NO_LENGTH : 1 ), 0, 2 * Math.PI);
                 ctx.fill();
             } else if( ( lo < 0 || hi > 0 ) && reach > 0 && k > 0 ) {
                 const a = _angle(value);
@@ -1068,6 +1082,7 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
                     ctx.fill();
                 }
             }
+            if( _clipped ) ctx.restore();
 
             if( k <= 0 ) {
                 // (no length: a point)
