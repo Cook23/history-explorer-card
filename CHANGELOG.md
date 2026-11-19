@@ -8,6 +8,7 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed
 - Home Assistant's theme switched from dark to light (the device's automatic theme too): the graphs' labels and grid kept the dark theme's colors — the card's background, fading (ha-card: 0.3 s), still dark the frame after the switch. Read again once the fade is over
+- Zoomed out in real time with time shown after the present: the window limited with the graduation before the zoom — the present moved on screen. The new range's graduation, the present kept where it is
 
 ### Added
 - An arrowline's extremes (`showMinMax`, *Appearance ▸ Extremes*, the curves' values): from each arrow's base, a light triangle on each side, to the lowest and highest direction of its zone, as long as its longest length there, in its color at the min/max band's opacity — `max` the clockwise side, `min` the anticlockwise one
@@ -27,7 +28,7 @@ Changelog for the HA History Explorer Card.
 
 ### Internal
 - `deps/timeline.js` imports `src/history-stats.js` (the one rule of means), documented in `deps/Chart Custom.js.md` (the contract) and `deps/timeline.js.md`; `tests/architecture.cjs`: Chart.js imports nothing of the card but it (`chart-imports`)
-- Tests (`features`): the theme switched to light, the card's background fading from dark; real time — a graduation past the present, the `>` greyed only with nothing after
+- Tests (`features`): the theme switched to light, the card's background fading from dark; real time — a graduation past the present, the `>` greyed only with nothing after; zoomed out then in with time after the present; a legend test's values fixed (a series' next step changed them)
 - Tests (`documented`): `realTimeStep` in the browser — `1h`, not set, `-1d`, `defaultTimeOffset`: loaded, dragged a graduation past the present and back, a new value, the date double-clicked; real time, its mark, the `>` greyed only with nothing after
 - Tests (`arrowline`): a row a column, a value alone over several columns; each arrow the mean of its zone, weighted by its length or not; the extremes' triangles, their sides; *Appearance ▸ Extremes* on an arrowline
 

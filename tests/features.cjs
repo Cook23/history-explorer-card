@@ -683,7 +683,9 @@ module.exports = async function()
     // ── A legend too narrow for its labels: shortened, the value kept ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [
         { entity: 'sensor.power', name: 'Ecowitt Vitesse du vent (Filtered)' }, { entity: 'sensor.power2', name: 'Météo-France Villeveyrac Vitesse du vent' }] }] }),
-        { mock: { series: true, language: 'fr' } });
+        // (their values fixed — 400 and 300 —, whatever the time: the states given again later
+        // (mkHass) the same, never a series' next step)
+        { mock: { series: true, language: 'fr', rows: { 'sensor.power': [[7200, '400']], 'sensor.power2': [[7200, '300']] } } });
     const legendAt = async w => {
         await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
         return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend;
@@ -1403,7 +1405,19 @@ module.exports = async function()
         await t.E('el.instance.incZoom()'); const back = await liveWin();
         return out.live && back.live && atPresent(out, 0) && atPresent(back, 0) && out.span === 2 * 86400 && back.span === 86400 ? true : JSON.stringify({ out, back });
     });
+    await t.step('zoomed out then in, in real time with some time empty after the present (less than a graduation): the present kept where it is on screen', async () => {
+        await t.E('el.instance.today()');
+        // (the present at three quarters of a graduation from the right edge)
+        await t.E(`(()=>{ const I=el.instance; I.moveTimeWindow(new Date(+new Date(I.startTime) + 0.75 * I.graduationMs())); })()`);
+        const pos = () => t.E(`(()=>{ const I=el.instance, a=+new Date(I.startTime), b=+new Date(I.endTime); return { f: Math.round((Date.now() - a) / (b - a) * 1000) / 1000, live: !!I.state.autoScroll, span: Math.round((b - a) / 1000), gap: Math.round((b - Date.now()) / 1000), grad: Math.round(I.graduationMs() / 1000) }; })()`);
+        const r0 = await pos();
+        await t.E('el.instance.decZoom()'); const out = await pos();
+        await t.E('el.instance.incZoom()'); const back = await pos();
+        const same = r => r.live && Math.abs(r.f - r0.f) <= 0.002;
+        return r0.live && r0.gap > 0 && r0.gap < r0.grad && same(out) && same(back) && out.span === 2 * r0.span && back.span === r0.span ? true : JSON.stringify({ r0, out, back });
+    });
     await t.step('dragged back: the history — \'>\' active, the window kept as new values come; dragged forward past the present: real time again, a graduation past it', async () => {
+        await t.E('el.instance.today()');
         await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) - 2 * 3600e3))`);
         const past = await liveWin(), end0 = await t.E('el.instance.endTime');
         await t.E(`setState('sensor.power', '321')`); await t.wait(3500);
