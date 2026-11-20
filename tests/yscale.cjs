@@ -726,11 +726,11 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The mean of an angle: lowpass_dt's rule (CLAUDE.md) — each value by its difference to
-    // the mean the shortest way round ──
+    // ── The mean of an angle: Home Assistant's circular mean (CLAUDE.md) — the direction of the
+    // sum of unit vectors, each weighted by how long ──
     t = await openCard(card('24h', {}, { entities: [{ entity: 'sensor.wind', lineMode: 'lines' }] }), { height: 900, mock: { series: true, fail: FAIL } });
     await t.wait(1500);
-    await t.step('an angle, a column of pixels holding 0°, 170°, 340° and 350° a quarter of it each: its point the mean of lowpass_dt — 305°, each value by its difference to it the shortest way round (215° unwrapped one after the other)', async () => {
+    await t.step('an angle, a column of pixels holding 0°, 170°, 340° and 350° a quarter of it each: its point Home Assistant\'s circular mean — the direction of the sum of the unit vectors, 350° (lowpass_dt\'s former rule, by the shortest-way differences: 305°)', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.wind', now = Date.now(), last = I.cache.length - 1;
             for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) for( const x of I.cache ) x[l].delete(id);
             const w = ( Date.parse(I.endTime) - Date.parse(I.startTime) ) / I.graphs[0].chart.hecPlotWidth(), g = Math.floor(( now - 6 * 3600e3 ) / w) * w;
@@ -739,7 +739,8 @@ module.exports = async function()
             I.generateGraphDataFromCache();
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), p = I.graphs[0].chart.data.datasets[0].data.find(q => q.y !== null && x(q) > g && x(q) < g + w);
             return p ? { y: ( ( p.y % 360 ) + 360 ) % 360, lo: p.yMin ?? null } : null; })()`);
-        return r && Math.abs(r.y - 305) < 1e-6 ? true : JSON.stringify(r);
+        const _r = Math.PI / 180, _ha = [0, 170, 340, 350].reduce(([x, y], a) => [x + Math.cos(a * _r), y + Math.sin(a * _r)], [0, 0]), _mean = ( ( Math.atan2(_ha[1], _ha[0]) / _r ) % 360 + 360 ) % 360;
+        return r && Math.abs(r.y - _mean) < 1e-6 ? true : JSON.stringify({ r, _mean });
     });
     done(await t.close());
 
@@ -814,6 +815,22 @@ module.exports = async function()
             return { far: far.map(w => [w.ids.length, Math.round(( Date.parse(w.end) - Date.parse(w.start) ) / 864e5)]),
                      before: __ws.some(w => w.type === 'history/history_during_period' && w.ids.includes('sensor.wind') && Date.parse(w.end) <= t0), loading: I.state.loading }; })()`);
         return r.far.length >= 1 && r.far[0][0] === 2 && r.far[0][1] >= 29 && !r.before && !r.loading ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (the same, the angle of state class measurement_angle: its statistics' mean circular, as Home Assistant compiles it)
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '30d', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.wind_a' }, { entity: 'sensor.power' }] }] },
+        { height: 900, mock: { series: true, states: { 'sensor.wind_a': { state: '200', unit: '°', state_class: 'measurement_angle' } } },
+          init: "document.addEventListener('DOMContentLoaded', ()=>{ document.body.style.width='400px'; const h=document.getElementById('host'); if( h ) h.style.width='400px'; })" });
+    await settle(t, 90000);
+    await t.step('an angle of state class measurement_angle drawn from statistics: drawn from them as any other curve — its history not asked besides', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime);
+            const st = __ws.filter(w => w.type === 'recorder/statistics_during_period' && w.ids.includes('sensor.wind_a'));
+            const h = __ws.filter(w => w.type === 'history/history_during_period' && Date.parse(w.start) < Date.now() - 26 * 3600e3 && w.ids.includes('sensor.wind_a'));
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
+            const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0 && x(p) <= t1);
+            return { circular: !!I.circularPeriodOf(I.graphs[0].entities[0]), stats: st.length, hist: h.length, drawn: d.length, fromStats: d.filter(p => p.statistics).length, source: I._sourceNeeded() }; })()`);
+        return r.circular && r.source !== 'history' && r.stats >= 1 && r.hist === 0 && r.drawn > 0 && r.fromStats > r.drawn / 2 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

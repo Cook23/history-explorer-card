@@ -671,18 +671,19 @@ Decided by the user about the silence detection:
 - lowpass_dt also derives a device class and a state class for its attribute sources; the
   card doesn't need them.
 
-### 4. The mean of a circular value — lowpass_dt is the reference, set by the user
+### 4. The mean of a circular value — Home Assistant is the reference, set by the user
 
-| card 1.2 | lowpass_dt |
-|---|---|
-| every mean of an angle: a column's point and its min/max (`card-datasets.js`), the average over a graph (`showStats`), the turn an angle's curve is shown in (`card-datasets.js` `_unwrapCircular`, given to `Chart.hecCircular.place`, which works out none) — the one rule in `history-stats.js` | `filter.py` `update_from_source` (lines 64-70: the mean; 101-103: its σ) |
+| card 1.2 | Home Assistant | lowpass_dt |
+|---|---|---|
+| every mean of an angle: a column's point and its min/max (`card-datasets.js`), the average over a graph (`showStats`), an arrowline's arrow (`deps/timeline.js`), the turn an angle's curve is shown in (`card-datasets.js` `_unwrapCircular`, given to `Chart.hecCircular.place`, which works out none) — the one rule in `history-stats.js` `circularMean` | `sensor/recorder.py` `_time_weighted_circular_mean`, `recorder/statistics.py` `weighted_circular_mean` (its statistics of a `measurement_angle`) | `filter.py` `update_from_source` — the same rule (its weights its EMA's: each value's duration times exp(−age / tau)), checked by its session against Home Assistant's `weighted_circular_mean` |
 
-lowpass_dt's algorithm is the one to use — never another one (no sin/cos vector mean, no
-mean of unwrapped values): each value counts by its shortest-path difference to the mean,
-`wrap(d) = ((d + P/2) mod P) − P/2`, weighted by how long it was in force (the value
-before counts for the interval since it: zero-order hold), the result in `[0, P)`.
-lowpass_dt runs it online, as its EMA: `y ← (y + α · wrap(x_prev − y)) mod P`. Over a group
-of values (a column, a window) its batch form: the mean m such that `Σ w · wrap(x − m) = 0`
-— from a first estimate (the mean of the values unwrapped), corrected by
-`m ← m + Σ w · wrap(x − m) / Σ w` until it no longer moves (1 or 2 passes); the min and the
-max are m plus the extreme `wrap(x − m)`, the σ from the same differences (as lowpass_dt's).
+Home Assistant's circular mean is the one to use (set by the user, 1.2.90: it replaced
+lowpass_dt's shortest-way mean, `Σ w · wrap(x − m) = 0` — a mean with several solutions when
+the values are spread, not made of partial means, different from Home Assistant's
+statistics): each value a unit vector at its angle (`2π x / P`), weighted by how long it was
+in force (the value before counts for the interval since it: zero-order hold); the mean the
+direction of their sum, `atan2(Σ w sin, Σ w cos)`, given in the turn wanted (the first
+value's, or an estimate's). The min and the max: the mean plus the extreme shortest-way
+difference `wrap(x − m)`, `wrap(d) = ((d + P/2) mod P) − P/2` (Home Assistant keeps none for
+an angle). Home Assistant combines periods by each one's mean weighted by the length of its
+sum (`mean_weight`) — exact; the card, given only their means, weights them by how long.

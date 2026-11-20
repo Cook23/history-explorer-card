@@ -8,16 +8,21 @@ Changelog for the HA History Explorer Card.
 
 ### Changed
 - An arrowline's arrows without a length — no `arrowLength`, or its entity without a value there — drawn at 80 % of their whole length (before: their whole length), their extremes' sectors and whole disc at 80 % of theirs as well
+- An angle of state class `measurement_angle` drawn from its statistics as any other curve — Home Assistant's mean of it circular, right across 0 (before: its history asked besides wherever drawn from statistics, as for an angle Home Assistant averages as a plain number)
+- The mean of an angle — a column of pixels, the average over a graph (`showStats`), an arrowline's arrow — Home Assistant's circular mean, as its statistics of a `measurement_angle`: the direction of the sum of unit vectors, each weighted by how long it lasted (before: lowpass_dt's, the mean by the shortest-way differences — with several solutions when the values are spread, and not the same as Home Assistant's statistics); its min and max still the largest differences to it each way
 
 ### Fixed
 - An arrowline's arrows and extremes past the graph's area (at its edges): drawn over the card's edge. Cut at the graph's area
+- On an iPhone (Safari, the Companion app), a dashboard with the card several times the screen's width and some 129 000 px tall, on the first load after an update, until the dashboard was edited (#312). The likely cause, not confirmed on the device yet: the entity selector measuring every entity's name in a box laid out on the page — as wide as the widest name, as tall as all of them — for the time of the measure, the page then left that large by Safari. Measured in a box of no size that hides what goes past it: the page never larger, even meanwhile
 - The toolbar's `>` at the end, in real time: it moved the window back to the end instead of a graduation past it, unless pressed less than a second after real time last moved the window (or the window a little past the end) — the end told by comparing the window's end with now, behind it until real time's next move. The end told by being on screen, as the window was last set
 
 ### Docs
 - README.md, README_Full.md, full-reference-config.yaml, `deps/timeline.js.md`: an arrowline's arrows without a length at 80 %, its arrows and extremes cut at the graph's area
+- README_Full.md: Home Assistant's statistics of an angle wrong only when its state class isn't `measurement_angle`; the mean of an angle, Home Assistant's and lowpass_dt's
+- `deps/timeline.js.md`, `deps/Chart Custom.js.md`: an angle's mean, Home Assistant's circular one
 
 ### Internal
-- Tests (`arrowline`): the arrows without a length at 80 %, the whole disc at 12 px, the arrows and their extremes within a clip of the chart area; (`features`): `>` at the end some seconds after real time last moved the window
+- Tests (`arrowline`): the arrows without a length at 80 %, the whole disc at 12 px, the arrows and their extremes within a clip of the chart area, an arrow's direction Home Assistant's circular mean; (`features`): `>` at the end some seconds after real time last moved the window, text measured without the page growing; (`yscale`): an angle of state class `measurement_angle` drawn from its statistics, its history not asked besides; the mocked Home Assistant compiles a `measurement_angle`'s statistics as it does — a circular mean alone
 
 
 ## [v1.2.89] - 2026-11-19

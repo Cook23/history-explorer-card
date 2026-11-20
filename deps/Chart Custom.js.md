@@ -29,7 +29,7 @@ only:
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
 | Both | `Chart.hecCircular` (§1) | Values that wrap around (angles): one rule placing them, for the card's samples and Chart.js's view |
-| Both | `src/history-stats.js`, imported by `deps/timeline.js` | The means — `timeWeightedMean`, and `circularMean` / `wrapDiff` for an angle (lowpass_dt's rule) —: one rule for the card's columns of pixels and each arrow of an arrowline, which Chart.js averages over its zone (`deps/timeline.js.md`). Data only — no DOM, no Chart, no entity —; the one file of the card Chart.js imports |
+| Both | `src/history-stats.js`, imported by `deps/timeline.js` | The means — `timeWeightedMean`, and `circularMean` / `wrapDiff` for an angle (Home Assistant's circular mean) —: one rule for the card's columns of pixels and each arrow of an arrowline, which Chart.js averages over its zone (`deps/timeline.js.md`). Data only — no DOM, no Chart, no entity —; the one file of the card Chart.js imports |
 
 Rules that keep it that way (checked by the `architecture` test):
 

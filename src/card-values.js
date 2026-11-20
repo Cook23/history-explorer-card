@@ -13,7 +13,7 @@ const moment = window.HXLocal_moment;
 
 
 // A curve's minimum, average (weighted by time: each value counts for as long as it lasted;
-// an angle's — P its period —, by lowpass_dt's rule, in [0, P)) and maximum over [t0, t1]
+// an angle's — P its period —, Home Assistant's circular mean, in [0, P)) and maximum over [t0, t1]
 // (ms) — samples: { t, v } in time order, the first one possibly before t0 (the value in
 // effect at t0); null when there's none
 function curveStats(samples, t0, t1, P = 0)

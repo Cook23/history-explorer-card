@@ -627,12 +627,17 @@ export class CardSelector
     {
         const _host = this._this.querySelector('#maincard');
         if( !_host ) return texts.map(() => 0);
-        const m = document.createElement('div');
-        m.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;width:max-content;white-space:nowrap';
+        // (in a box of no size that hides what goes past it: the lines — every entity's, as
+        // wide as the widest, as tall as all of them — never make the card nor the page larger,
+        // even for the time of the measure: Safari on iOS kept the page that large after it)
+        const _box = document.createElement('div'), m = document.createElement('div');
+        _box.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;width:0;height:0;overflow:hidden';
+        m.style.cssText = 'position:absolute;left:0;top:0;width:max-content;white-space:nowrap';
         for( const t of texts ) { const d = document.createElement('div'); d.style.width = 'max-content'; d.textContent = t; m.appendChild(d); }
-        _host.appendChild(m);
+        _box.appendChild(m);
+        _host.appendChild(_box);
         const _w = [...m.children].map(d => Math.ceil(d.getBoundingClientRect().width));
-        m.remove();
+        _box.remove();
         return _w;
     }
 

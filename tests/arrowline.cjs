@@ -195,6 +195,11 @@ module.exports = async function()
             const a = await drawn(1), b = await drawn(2);
             return JSON.stringify(a.a) === '[355]' && b.a.length >= 1 && b.a.every(x => x === 0 || x === 360) ? true : JSON.stringify({ a, b });
         });
+        await t.step('an arrow\'s direction: Home Assistant\'s circular mean — the direction of the sum of unit vectors: 0°, 0° and 170° alternating, 9.7° (the mean by the shortest-way differences would give 56.7°)', async () => {
+            await rows(1, 'k=>k%3==2?170:0', 'k=>undefined');
+            const r = await drawn(1);
+            return r.a.length >= 1 && r.a.every(x => x === 10) ? true : JSON.stringify(r.a);
+        });
         await t.step('extremes (showMinMax: all): a sector of a disc each side of the arrow, from its base, in its color at the min/max band\'s alpha (0.3); max only: the clockwise one', async () => {
             await rows(3, 'k=>k%2?10:350', 'k=>undefined', { min: true, max: true });
             const both = await drawn(3);

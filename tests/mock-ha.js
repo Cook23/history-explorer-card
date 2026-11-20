@@ -193,7 +193,8 @@ function history(d){
 // period (an hour; 5 minutes, d.period '5minute'; a day, 'day'; a week; a month, 30 days) once it has ended (and a few minutes for
 // the compiling, MOCK.statsLag, 10 min by default), from the mocked history — a
 // measurement its mean (weighted by time, the state in force at its start included), min
-// and max, a total its state at the period's end and its sum; none for a period not ended. The hourly ones kept for ever, the 5-minute ones as
+// and max, an angle (measurement_angle) its circular mean alone, a total its state at the
+// period's end and its sum; none for a period not ended. The hourly ones kept for ever, the 5-minute ones as
 // long as the history (historyDays). MOCK.noStatistics: entities without any
 function statistics(d){
   const P={ '5minute':300e3, hour:3600e3, day:86400e3, week:7*86400e3, month:30*86400e3 }[d.period] ?? 3600e3;
@@ -218,6 +219,15 @@ function statistics(d){
         let acc=0; h.forEach((x,i)=>{ acc+=x.v*((i+1<h.length?h[i+1].t:t+P)-x.t); });
         const v=h.map(x=>x.v);
         pts.push({start:t,end:t+P,mean:acc/(t+P-h[0].t),min:Math.min(...v),max:Math.max(...v)}); }
+      else if(sc==='measurement_angle'){
+        // (an angle, as Home Assistant compiles it — sensor/recorder.py DEFAULT_STATISTICS: its
+        // mean alone, circular — the mean of the unit vectors, each weighted by how long —, no min
+        // nor max)
+        const h=(history({entity_ids:[e], start_time:new Date(t).toISOString(), end_time:new Date(t+P).toISOString(), no_attributes:true, compiling:true})[e]||[])
+          .map(x=>({t:x.lu*1000, v:Number(x.s)})).filter(x=>!isNaN(x.v));
+        if(!h.length) continue;
+        let sx=0, sy=0; h.forEach((x,i)=>{ const w=(i+1<h.length?h[i+1].t:t+P)-x.t; sx+=w*Math.cos(x.v*Math.PI/180); sy+=w*Math.sin(x.v*Math.PI/180); });
+        pts.push({start:t,end:t+P,mean:((Math.atan2(sy,sx)*180/Math.PI)+360)%360}); }
       else { const v=Number(valueAt(e,(t+P)/1000)); pts.push({start:t,end:t+P,state:v,sum:v}); } }
     if(pts.length) r[e]=pts;
   }
