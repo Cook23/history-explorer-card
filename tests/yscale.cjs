@@ -726,11 +726,11 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The mean of an angle: lowpass_dt's rule (CLAUDE.md) — each value by its difference to
-    // the mean the shortest way round ──
+    // ── The mean of an angle: Home Assistant's circular mean (CLAUDE.md) — the direction of the
+    // sum of unit vectors, each weighted by how long ──
     t = await openCard(card('24h', {}, { entities: [{ entity: 'sensor.wind', lineMode: 'lines' }] }), { height: 900, mock: { series: true, fail: FAIL } });
     await t.wait(1500);
-    await t.step('an angle, a column of pixels holding 0°, 170°, 340° and 350° a quarter of it each: its point the mean of lowpass_dt — 305°, each value by its difference to it the shortest way round (215° unwrapped one after the other)', async () => {
+    await t.step('an angle, a column of pixels holding 0°, 170°, 340° and 350° a quarter of it each: its point Home Assistant\'s circular mean — the direction of the sum of the unit vectors, 350° (lowpass_dt\'s former rule, by the shortest-way differences: 305°)', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.wind', now = Date.now(), last = I.cache.length - 1;
             for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) for( const x of I.cache ) x[l].delete(id);
             const w = ( Date.parse(I.endTime) - Date.parse(I.startTime) ) / I.graphs[0].chart.hecPlotWidth(), g = Math.floor(( now - 6 * 3600e3 ) / w) * w;
@@ -739,7 +739,8 @@ module.exports = async function()
             I.generateGraphDataFromCache();
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), p = I.graphs[0].chart.data.datasets[0].data.find(q => q.y !== null && x(q) > g && x(q) < g + w);
             return p ? { y: ( ( p.y % 360 ) + 360 ) % 360, lo: p.yMin ?? null } : null; })()`);
-        return r && Math.abs(r.y - 305) < 1e-6 ? true : JSON.stringify(r);
+        const _r = Math.PI / 180, _ha = [0, 170, 340, 350].reduce(([x, y], a) => [x + Math.cos(a * _r), y + Math.sin(a * _r)], [0, 0]), _mean = ( ( Math.atan2(_ha[1], _ha[0]) / _r ) % 360 + 360 ) % 360;
+        return r && Math.abs(r.y - _mean) < 1e-6 ? true : JSON.stringify({ r, _mean });
     });
     done(await t.close());
 
