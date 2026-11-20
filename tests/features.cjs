@@ -2298,5 +2298,20 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── The entity lines measured in a box of no size: the page never larger, even meanwhile ──
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    await t.step('text measured (_textWidths) in a box of no size, hiding what goes past it: the widths as each text alone gives them; the page no larger while 5000 lines, some 1400 px wide, are measured', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, host = el.querySelector('#maincard'), de = document.documentElement;
+            const texts = Array.from({ length: 5000 }, (_, k) => 'x'.repeat(k % 7 ? 10 : 200) + k);
+            const ref = texts.slice(0, 20).map(t => { const d = document.createElement('span'); d.style.cssText = 'position:absolute;white-space:nowrap;visibility:hidden'; d.textContent = t; host.appendChild(d); const w = Math.ceil(d.getBoundingClientRect().width); d.remove(); return w; });
+            const before = [de.scrollWidth, de.scrollHeight], g = Element.prototype.getBoundingClientRect; let during = null;
+            Element.prototype.getBoundingClientRect = function() { if( during === null ) during = [de.scrollWidth, de.scrollHeight]; return g.call(this); };
+            let w; try { w = I._textWidths(texts); } finally { Element.prototype.getBoundingClientRect = g; }
+            return { same: w.slice(0, 20).every((x, i) => Math.abs(x - ref[i]) <= 1), widest: Math.max(...w), before, during, after: [de.scrollWidth, de.scrollHeight] }; })()`);
+        return r.same && r.widest > r.before[0] && JSON.stringify(r.during) === JSON.stringify(r.before) && JSON.stringify(r.after) === JSON.stringify(r.before) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };
