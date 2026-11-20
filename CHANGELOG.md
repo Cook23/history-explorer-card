@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.91] - 2026-11-20
+
+### Fixed
+- An arrowline's extremes past the arrows' band (a sector pointing down or up, a large sector, a whole disc): drawn over the graph above or below. Cut at the band, as asked — not at the graph's area (1.2.90)
+
+### Docs
+- README_Full.md, `deps/timeline.js.md`: an arrowline's arrows and extremes cut at their band
+
+### Internal
+- Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band
+
+
 ## [v1.2.90] - 2026-11-19
 
 ### Changed
