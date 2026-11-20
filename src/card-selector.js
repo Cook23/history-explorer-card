@@ -627,8 +627,12 @@ export class CardSelector
     {
         const _host = this._this.querySelector('#maincard');
         if( !_host ) return texts.map(() => 0);
+        // (the box is kept out of the card's layout: no size of its own, its content clipped and
+        // its painting contained, so the lines it holds — one per entity name, thousands of
+        // them — cannot enlarge the scrollable area of the card or of the page while it is in
+        // the document; their own widths, which is all that's measured, are unaffected)
         const m = document.createElement('div');
-        m.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;width:max-content;white-space:nowrap';
+        m.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;width:0;height:0;overflow:hidden;contain:layout paint;white-space:nowrap';
         for( const t of texts ) { const d = document.createElement('div'); d.style.width = 'max-content'; d.textContent = t; m.appendChild(d); }
         _host.appendChild(m);
         const _w = [...m.children].map(d => Math.ceil(d.getBoundingClientRect().width));

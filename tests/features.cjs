@@ -1708,6 +1708,18 @@ module.exports = async function()
             const shown = await t.E(`[...el.querySelector('#es_0').children].filter(a => a.style.display !== 'none').map(a => a.dataset.name)`);
             return shown.includes(full) ? true : JSON.stringify({ full, shown: shown.slice(0, 5) });
         });
+        if( ln === 'real' ) await t.step('measuring every line leaves the card and the page the size they were: the box the widths are measured in, in the document while it is read, adds nothing to what scrolls', async () => {
+            // (the box holds one line per entity name, thousands of them: read while it is in the
+            // document, as Safari does when the card measures, the page must not grow — it's the
+            // height it kept after the box was gone that made a dashboard a huge empty canvas)
+            const r = await t.E(`(()=>{ const I=el.instance, de=document.documentElement, card=el.querySelector('#maincard');
+                const before={ h:de.scrollHeight, w:de.scrollWidth };
+                const rect=Element.prototype.getBoundingClientRect; let maxH=0, maxW=0;
+                Element.prototype.getBoundingClientRect=function(){ maxH=Math.max(maxH,de.scrollHeight); maxW=Math.max(maxW,de.scrollWidth); return rect.call(this); };
+                let w=[]; try { w=I._textWidths(Array.from({length:3000},(_,k)=>'sensor.a_long_entity_name_'+k)); } finally { Element.prototype.getBoundingClientRect=rect; }
+                return { before, maxH, maxW, after:{ h:de.scrollHeight, w:de.scrollWidth }, n:w.length, first:w[0], card:Math.round(card.getBoundingClientRect().height) }; })()`);
+            return r.n === 3000 && r.first > 0 && r.maxH === r.before.h && r.maxW === r.before.w && r.after.h === r.before.h ? true : JSON.stringify(r);
+        });
         done(await t.close());
     }
 
