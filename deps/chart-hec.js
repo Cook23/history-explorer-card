@@ -2966,14 +2966,20 @@
     // The side a tooltip prefers beside its point (the tooltip's determineAlignment): behind
     // the pointer's move as the hover goes — moving rightward, on the point's left ('right':
     // the box's right edge at the point), and the other way round —, decided when it shows a
-    // new point and kept while it stays on it, whatever the pointer does meanwhile; null
-    // without a direction (a finger, no hover): the rule of the plot's halves
+    // new point and kept while it stays on it, whatever the pointer does meanwhile; without a
+    // direction (a finger, no hover), the way from the point the tooltip showed before
+    // (_hecTooltipX: kept when it hides) to this one — a point further right, on its left, and
+    // the other way round; none either (the first one, the same place): null, the rule of the
+    // plot's halves
     _hecTooltipXAlign: function (tooltip) {
       var a = tooltip._active && tooltip._active[0];
       if (!a) { this._hecTooltipSideOf = null; return null; }
       if (this._hecTooltipSideOf !== a) {
         this._hecTooltipSideOf = a;
         var d = this._hecPointerDirX();
+        var x = a._model ? a._model.x : a._view ? a._view.x : null;
+        if (!d && x !== null && this._hecTooltipX !== undefined && this._hecTooltipX !== null) d = x > this._hecTooltipX ? 1 : x < this._hecTooltipX ? -1 : 0;
+        if (x !== null) this._hecTooltipX = x;
         this._hecTooltipSide = d > 0 ? 'right' : d < 0 ? 'left' : null;
       }
       return this._hecTooltipSide;

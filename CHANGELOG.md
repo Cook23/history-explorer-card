@@ -9,15 +9,19 @@ Changelog for the HA History Explorer Card.
 ### Added
 - A graph's menu: *Add ▸* first — an entity added to that graph: the card's *Add an entity* field (its attributes ▸, a `*` pattern), then the display types the graph can show it as. Taken as a curve dragged onto the graph: one it shows already, or a state that isn't a number on a graph other than a timeline, refused (said, the graph outlined); one shown in another graph, *Cancel* or *Second curve*, as the card's field
 
+### Changed
+- The tooltip's side beside its point without a pointer's move to follow (a finger, a click without a hover): the way from the point the tooltip showed before to this one — further right, on its left, and the other way round —; the first one, the half of the graph it's in (before: always the half of the graph)
+
 ### Fixed
 - An arrowline's extremes past the arrows' band (a sector pointing down or up, a large sector, a whole disc): drawn over the graph above or below. Cut at the band, as asked — not at the graph's area (1.2.90)
 
 ### Docs
 - README_Full.md, `deps/timeline.js.md`: an arrowline's arrows and extremes cut at their band
 - README_Full.md: a graph's menu, *Add ▸*
+- `deps/Chart Custom.js.md`: the tooltip's side without a direction
 
 ### Internal
-- Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band; (`graphmenu`): *Add ▸* — an entity added, refused, a second curve, the types the graph takes
+- Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band; (`graphmenu`): *Add ▸* — an entity added, refused, a second curve, the types the graph takes; (`points`): the tooltip's side from the point shown before
 - `shownIn`: how a series is shown in a graph — the rule of a curve dragged onto it (`typeInto`), for a curve added to it too (`addCurvesTo`); `addGraph`'s `into`
 
 
