@@ -17,13 +17,6 @@ Changelog for the HA History Explorer Card.
 - A locked Y axis (its range set by hand, its ends anywhere): the labels near its ends left out while they had room — kept away from the end's label, which isn't shown off the step's grid. Kept now when half a label from such an end
 - An arrowline's extremes past the arrows' band (a sector pointing down or up, a large sector, a whole disc): drawn over the graph above or below. Cut at the band, as asked — not at the graph's area (1.2.90)
 
-### Docs
-- README_Full.md, `deps/timeline.js.md`: an arrowline's arrows and extremes cut at their band
-- README_Full.md: a graph's menu, *Add ▸*
-- `deps/Chart Custom.js.md`: the tooltip's side without a direction
-- README.md, README_Full.md, full-reference-config.yaml, `deps/Chart Custom.js.md`: `alignment`, *Appearance ▸ Alignment*; README.md: a graph's menu, *Add ▸*; README_Full.md: the tooltip's side with a finger
-- README.md: the version highlights reviewed — v1.2.88 (an arrowline's extremes), v1.2.37 (a curve's appearance in its menu), v1.2.21 (the calendar) added; v1.2.84, v1.2.83, v1.2.82, v1.2.60 and v1.2.59 removed; v1.2.77: the optimization stage's end; v1.2.0: the complete rewrite
-
 ### Internal
 - Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band; (`graphmenu`): *Add ▸* — an entity added, refused, a second curve, the types the graph takes; (`points`): the tooltip's side from the point shown before; (`graphmenu`): `alignment` and *Appearance ▸ Alignment*; (`yscale`): a locked axis' labels near its ends (`bareEnds`)
 - `shownIn`: how a series is shown in a graph — the rule of a curve dragged onto it (`typeInto`), for a curve added to it too (`addCurvesTo`); `addGraph`'s `into`
@@ -41,11 +34,6 @@ Changelog for the HA History Explorer Card.
 - On an iPhone (Safari, the Companion app), a dashboard with the card several times the screen's width and some 129 000 px tall, on the first load after an update, until the dashboard was edited (#312). The likely cause, not confirmed on the device yet: the entity selector measuring every entity's name in a box laid out on the page — as wide as the widest name, as tall as all of them — for the time of the measure, the page then left that large by Safari. Measured in a box of no size that hides what goes past it: the page never larger, even meanwhile
 - The toolbar's `>` at the end, in real time: it moved the window back to the end instead of a graduation past it, unless pressed less than a second after real time last moved the window (or the window a little past the end) — the end told by comparing the window's end with now, behind it until real time's next move. The end told by being on screen, as the window was last set
 
-### Docs
-- README.md, README_Full.md, full-reference-config.yaml, `deps/timeline.js.md`: an arrowline's arrows without a length at 80 %, its arrows and extremes cut at the graph's area
-- README_Full.md: Home Assistant's statistics of an angle wrong only when its state class isn't `measurement_angle`; the mean of an angle, Home Assistant's and lowpass_dt's
-- `deps/timeline.js.md`, `deps/Chart Custom.js.md`: an angle's mean, Home Assistant's circular one
-
 ### Internal
 - Tests (`arrowline`): the arrows without a length at 80 %, the whole disc at 12 px, the arrows and their extremes within a clip of the chart area, an arrow's direction Home Assistant's circular mean; (`features`): `>` at the end some seconds after real time last moved the window, text measured without the page growing; (`yscale`): an angle of state class `measurement_angle` drawn from its statistics, its history not asked besides; the mocked Home Assistant compiles a `measurement_angle`'s statistics as it does — a circular mean alone
 
@@ -57,10 +45,6 @@ Changelog for the HA History Explorer Card.
 - An arrowline's arrows 1.7 times as long at their whole length — about 80 % of the row's height (before: under half) —, their head unchanged
 - An arrowline's length from an entity: its automatic scale worked out on the entity's means over an arrow's zone, as the arrows show it — the longest arrow at its whole length, or nearly (before: on its raw values, rounder ones on top — the arrows, means, all short)
 - The toolbar's `<` `>`: the window moved back or forward by max(min(90 % of it, it less half a graduation of the time axis), 80 % of it) — 10 % to 20 % of it still shown —, its start then on the roundest time nearest that keeps the move within 80 % to 90 % (a month's first, a Monday, midnight, an hour, ten minutes, a minute — the coarsest the window's length allows, a finer one when none fits), the range kept (before: a day, from midnight; a range under a day made a day); `>` passing the end, or leaving it less than 20 % of the window ahead, stops with it on the right edge, the next one goes a graduation past it; from there `<` comes back to the end on the right edge
-
-### Docs
-- README_Full.md, full-reference-config.yaml: an arrowline's extremes as sectors, the arrows' length and its scale; `<` and `>`
-- README.md, README_Full.md, full-reference-config.yaml: `realTimeStep`'s end — where the window ends in real time — told apart from the present, now
 
 ### Internal
 - `arrowSpacing`, the room between two arrows, given by the card; a row's `turn`, how far its direction went each way (`deps/timeline.js.md`)
@@ -86,10 +70,6 @@ Changelog for the HA History Explorer Card.
 - An arrowline's arrows: each the mean of its zone — the time under it, as wide as the space between two arrows —, from the most precise data for each column of pixels: the direction's mean — circular for a circular entity, for its own period, Chart.js told the period (`circularPeriod`), never guessing 360 —, the length's mean, each value weighted by how long it lasts (before: the one value in force at the arrow's middle, the length read at the middle of that value's time)
 - An arrowline's tooltip: a column of pixels, as a curve's — the direction, then the length, each `min / mean / max` of the column (before: the one value in force there); its title the statistics where its values come from them (before: always the history)
 
-### Docs
-- README_Full.md, full-reference-config.yaml: each arrow the mean of its zone, `arrowWeighting`, an arrowline's extremes
-- README.md, README_Full.md, full-reference-config.yaml: `realTimeStep` — its three kinds of present, real time, a graduation past the present
-
 ### Internal
 - `deps/timeline.js` imports `src/history-stats.js` (the one rule of means), documented in `deps/Chart Custom.js.md` (the contract) and `deps/timeline.js.md`; `tests/architecture.cjs`: Chart.js imports nothing of the card but it (`chart-imports`)
 - Tests (`features`): the theme switched to light, the card's background fading from dark; real time — a graduation past the present, the `>` greyed only with nothing after; zoomed out then in with time after the present; a legend test's values fixed (a series' next step changed them)
@@ -108,9 +88,6 @@ Changelog for the HA History Explorer Card.
 - The entity selector's field — the card's and *Entity ▸*'s —: its text where its list's lines' text starts (before: a few pixels left of them); *Entity ▸*'s field its line's whole width
 - `fill: solid` ignored on an arrowline — the band behind the arrows hid them —: its default instead (`light`; `false` with its color defined), given directly or read indirectly
 - A timeline's blocks outlined in their state's color whatever their fill (before: with `fill: false` only) — `light` and `fade` blocks told apart; `solid` looks the same
-
-### Docs
-- README_Full.md: a timeline's blocks outlined; `fill: solid` ignored on an arrowline
 
 ### Internal
 - Tests (`indirect`): *Color ▸ Entity ▸* then *Fill ▸ Entity ▸* — one field, the list under Fill's box, filtered
@@ -139,9 +116,6 @@ Changelog for the HA History Explorer Card.
 - The menus' lines: their text's left and right margins halved (5 px; the titles too)
 - `fill: light` the value, `true` its alias (before: `true`, `light` its synonym) — kept, exported and shown in the menus as `light`; its default: `light` with the color not defined (the palette's light fill before), `false` with it defined; a bar's and a timeline's: `solid`
 
-### Docs
-- README.md, README_Full.md: the menus' widths, two wide characters; `fill`'s default by type, a timeline's fill
-
 ### Internal
 - Tests (`indirect`): a deep cascade (Color ▸ Entity ▸ Thresholds ▸ + Add ▸): each box leaving no more than the start of the lines under it, the last one's field within the menu
 
@@ -159,9 +133,6 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed
 - `look: mini`, `showTimeLabels: false` ([#307](https://github.com/Cook23/history-explorer-card/issues/307)): the time labels hidden were only painted transparent — still laid out, the plot short of the card's sides (~17 px each) and bottom (~26 px); now out of the layout, the plot taking their room. A graph without time labels may then reach further right than one with them
-
-### Docs
-- README.md (a version highlight), README_Full.md: the automatic color, *Color ▸ Automatic*; the menus' widths; `showTimeLabels` for every graph, the plot taking the labels' room
 
 ### Internal
 - `fitCascade`: the cascade of menus fitted when a box opens or closes; a field's line counts its first three characters as a line's
@@ -186,10 +157,6 @@ Changelog for the HA History Explorer Card.
 - Home Assistant's card editor ([#301](https://github.com/Cook23/history-explorer-card/issues/301)): the room kept under the card for its menus (1.2.82) was kept on the dashboard too while it's edited — a large gap under every card; Home Assistant tells a card it's previewed in both places (`preview`): the room now kept only in the card editor's window
 - A curve's fill lost on a change of its display type (a curve made an arrowline, a bar, then a curve again): kept — a timeline's row keeps it without showing it
 
-### Docs
-- README.md, README_Full.md, `full-reference-config.yaml`: *Entity ▸* under *Color*, *Fill* and *Length*; `fill`'s values `false`, `fade`, `light` (`true`), `solid`; a bar's fill; `arrowLength` thresholds; `arrowLength` and `colorTransition` in the persistence table
-- FORK_DESCRIPTION.md, FORK_DESCRIPTION_FR.md: the fill and the arrows' length read as the color, chosen from the curve menu too
-
 ### Internal
 - The entity selector factored (`bindEntitySelector`, `menuSelector`, `sortEntities`, `entityMatcher`): the toolbars' and the menus' one (`MENU_SELECTOR`)
 - *Export ▸ YAML*: an option read indirectly written in YAML form (`indirectYaml`); the YAML writer takes a `Map` (its keys' order kept) and writes a number key unquoted
@@ -205,7 +172,6 @@ Changelog for the HA History Explorer Card.
 - `fill` read indirectly, as `color`: thresholds on the value or on another entity's or attribute's, or an entity holding a fill — its values `true`, `false`, `fade` or a color —, evaluated at each point
 
 ### Fixed
-- The READMEs' screenshots: their links pointed to the branch `main`, renamed `v1.1-legacy` — GitHub doesn't redirect a file's raw link: every image missing (404). The screenshots copied into `v1.2-dev` (`images/screenshots/`), the links pointing there
 - Home Assistant's card editor, a card with a short YAML and no graph yet ([#301](https://github.com/Cook23/history-explorer-card/issues/301)): an entity chosen in the selector wasn't added — the editor's preview, a box that scrolls, is no higher than the card there: the entity's menu, opening under the field out of it, closed at once, the entity selector's list cut. The card keeps room under itself in the editor's preview (`preview`: Home Assistant's), always, as high as the selector's lists open (`SELECTOR_LIST_MAX_HEIGHT`)
 - *Export ▸ YAML*: a soft bound (`ymin`, `ymax`, `yminRight`, `ymaxRight`, `arrowMax`) was written in its internal form (`soft: 700`); now as the YAML writes it, `~700`
 - An arrowline's `color` read indirectly (thresholds, another entity's value, an entity holding it) was evaluated once, for its value now, every arrow drawn in it: each arrow now takes the color of the time it shows, as a curve's point and a bar do; its `fill` too, the band under each arrow its own
@@ -214,15 +180,6 @@ Changelog for the HA History Explorer Card.
 - Every option of an entity set at the four levels — the card, `entityOptions`, a graph, the entity —, by the one chain: `color`, `unit`, `hidden`, `scale`, `process`, `circular`, `legendVisible`, `fixedValue` on a graph too, and on the card for those it didn't take; but `type` and `name` (an entity's only: on the card the card's type and mini-graph-card's title, on a graph the graph's own type and its `title`). `legendVisible` the same at every level: `false`, no label for its curves; `auto`, on a graph or the card, a graph's legend only for several labels (before: on the card, no legend at all, whatever an entity said)
 - `lineColor`: a color by place in a graph for the entities added from the card too (before: the YAML's only); a graph's above its `color`, the card's below a graph's `color` and `entityOptions`' (above before), above the card's `color`
 - An arrowline's arrows drawn as a path instead of an image (drawn at once, scaled to their length)
-
-### Docs
-- The READMEs in one plan, README.md's, README_Full.md following it: Overview, Install, Quick configuration, Usage, Detailed configuration, Options — the sections in order of use; the version highlights summed up; the YAML export as a help in Home Assistant's card editor
-- Install from Home Assistant's Marketplace (HACS before Home Assistant 2026.11), step by step; reload the page, add the card; the sidebar panel step by step
-- The READMEs made homogeneous: one writing style, in the present; lists as **Label** — text; long paragraphs and dense passages split into lists and tables (an attribute's units: a table); each screenshot at its size on the screen; Home Assistant's menu paths with `›`
-- The options' tables complete — every option of the card, a graph and an entity —, by theme, in order of use, the same rows in both READMEs: each option in bold, its aliases in italics under it; its default, then what it does — short in README.md, detailed with a link to its section in README_Full.md; each table's notes under it (README.md)
-- README_Full.md's Options: `entityOptions` and the four levels before the tables; *Scaling values* and *Custom data processing functions* in Detailed configuration
-- `full-reference-config.yaml`: `uimode` and `sizePoints`; `uiLayout.selector`'s default `top` and `gestures.readingTimePerWord`'s `400`, as the card's; the statistics' periods and the interpolations completed
-- The info panel's link to the curve menu named as the card shows it, *Curve ▾*; link titles brought up to date
 
 ### Internal
 - The levels an option takes derived from one list of exceptions (`ENTITY_ONLY_KEYS`); `lineColor` resolved with the other options when a curve is added (`_applyEntityDefaults`) — no longer written onto the YAML's entities while its graphs are read; the card's legend read as every option (`hideLegend`, `legendAuto` gone)
@@ -343,9 +300,6 @@ Changelog for the HA History Explorer Card.
 - The theme was read once, when the card was made: switched from dark to light, the grid stayed white at 10 % — invisible —, the labels and the cursor line in the dark theme's colors, until the page was loaded again. A switch (dark ↔ light) is now followed, by the card and the info panel: the labels, the grid, the cursor line and the states' colors of the new theme, every graph built again in them, in its place — its curves as they were
 - Tests (`features`, `panel`): switched to the other theme, then back — the labels and the grid in each theme's colors; in the panel, the bars chosen and the color kept
 
-### Documentation
-- README_Full, *Info panel limitations*: the line saying the info panel has no CSV export removed — its curve menu has *Export ▸*
-
 ### Internal
 - Tests (`settings`): the precision step on a curve of a constant value — a curve passing near the label made the result depend on the hour
 
@@ -451,9 +405,6 @@ Changelog for the HA History Explorer Card.
 - The graphs off the screen, drawn after those on it, told as such (they were told as come near the screen)
 - Back on the page: the time the app was left told as away from the app, never as a freeze
 - Tests (`cards`): what follows the answers timed; the time away told as such
-
-### Documentation
-- ARCHITECTURE.md, BRANCH.md, README_Full: the sparse sensors probed over 24 hours; the background's order (the angles, the exports' probes, the sides); phase 3 — phase 1's sides, after phase 2; the purge's zone; a `defaultTimeRange` not in the selector rounded up to the next range; the list of test suites
 
 ## [v1.2.72] - 2026-11-12
 
@@ -600,9 +551,6 @@ Changelog for the HA History Explorer Card.
 - The exported files are declared `text/csv` (`text/plain` before): HA Companion, which names a downloaded file by its type, gives them `.csv` instead of `.txt` (their name stays its own: the app doesn't take the card's)
 - Tests (`attributes`): the file's type
 
-### Changed — docs
-- README_Full: the fine source empty without phase 1, the history before the statistics without phase 2, the mean of an angle, the order of the requests; BRANCH.md: phase 2's fallbacks, the history before the statistics, the order of the requests; ARCHITECTURE.md: `history-stats.js`, `ha-requests.js`, `card-perf.js`, the tests' menu; README, README_Full: the tests in the options menu, the performance test; CLAUDE.md: the mean of an angle, lowpass_dt the reference, the user's Home Assistant (90 days of history)
-
 ## [v1.2.66] - 2026-11-10
 
 ### Changed — the automatic Y axis, an automatic gain
@@ -620,9 +568,6 @@ Changelog for the HA History Explorer Card.
 ### Fixed — the export of an attribute
 - A curve of an attribute (a weather's wind bearing) counted its entity in the Export menu — not in the cache: "History (0)", greyed, though its curve was drawn —, and its file held its entity's state. The export now holds the values the curves show: an attribute's own values; with `exportAttributes`, an entity shown by its state with all its attributes, an attribute shown still its own values. An attribute has no statistics: never in their export
 - Tests (`attributes`): a graph of attributes — its history counted, its file their values, with the attributes asked too
-
-### Changed — docs
-- README_Full: *The automatic scale*, the min/max band, smart mode's plateaus, the export of an attribute; ARCHITECTURE.md: `card-yscale.js`; BRANCH.md: the min/max band; `deps/Chart Custom.js.md`: `showMinMax`'s spans
 
 ## [v1.2.65] - 2026-11-10
 
@@ -643,9 +588,6 @@ Changelog for the HA History Explorer Card.
 - What the card keeps on this device to spare working it out again — never a user's choice: the statistics probes' verdicts, the automatic Y axes, the entity selector's widths and shorter lines — is let go when the card's version changes (a rule, a font, a text may have changed what it would work out). The card keeps its version on this device; the first time a new one runs, its title reads "(new)" after its version (in the user's language)
 - The user's choices kept on this device (the card's state, the gesture thresholds, the info panel) never let go
 - Tests (`architecture`): every key kept on this device a constant in one of the two lists — the user's choices (`KEPT_KEYS`), what the card worked out (`DERIVED_KEYS`)
-
-### Changed — docs
-- README_Full: *Only valid statistics*, *What is kept, and where* (what the card worked out); BRANCH.md: phase 0; CLAUDE.md: what the card works out, purged with a new version
 
 ## [v1.2.64] - 2026-11-10
 
@@ -669,9 +611,6 @@ Changelog for the HA History Explorer Card.
 ### Tests
 - `architecture`: `option-defaults` reports every local fallback and points to the exact rule (CLAUDE.md, ARCHITECTURE.md rule 9): a business default moved to its place, a module's fallback the rule allows listed as an exception
 - `yscale`: a real month of a Home Assistant's history (`dataset.cjs`, the mock's `states` — the data set private, never in the repository: on the machine running the tests only, the test skipped without it): each sensor's statistics told by the probe; statistics made up held, a plateau in smart mode; the band along a plateau; the hourly statistics drawn for six months where the history is loaded too; the probe's 24 hours
-
-### Changed — docs
-- README_Full: *Kept when the card is drawn again*, *Only valid statistics* (the probe), *The coarsest source a column holds, first*, *Statistics made up, a value held*, smart mode's plateaus (statistics made up, the band); BRANCH.md: phase 0, *Drawing*
 
 ## [v1.2.63] - 2026-11-10
 
@@ -700,9 +639,6 @@ Changelog for the HA History Explorer Card.
 - `yScaleSteadinessLeft`: a synonym of `yScaleSteadiness`
 - Tests (`yscale`): `yScaleSteadinessLeft` on the card
 
-### Changed — docs
-- README_Full: *What the window needs, in phases*, *Only valid statistics*, *In the background*, *Requests to Home Assistant*, *The last minutes from the history*, the automatic scale's values around the window, the angles; the options' table: `yScaleSteadinessLeft`; ARCHITECTURE.md: `card-history.js`'s phases, `ha-requests.js`
-
 ## [v1.2.61] - 2026-11-09
 
 ### Changed — what the cache lacks, in three passes
@@ -719,9 +655,6 @@ Changelog for the HA History Explorer Card.
 ### Fixed — the min/max band's edges follow the curve
 - The edges of the min/max band (`showMinMax`) were straight lines from one point to the next: they're drawn as the curve is — straight, in steps, or curves of the same interpolation (monotone, makima, Catmull-Rom, Steffen, B-spline) —, without a line of their own (`hecMinMaxBand`)
 - Tests (`features`): the band's edges in each line mode and interpolation
-
-### Changed — docs
-- README_Full: *Drawn at once, in three passes*, *Ahead*, *Requests to Home Assistant* (Long term statistics), the automatic scale's values around the window, the min/max band's edges; ARCHITECTURE.md: `ha-requests.js`, the cache's three passes; `deps/Chart Custom.js.md`: `showMinMax`'s edges
 
 ## [v1.2.60] - 2026-11-09
 
@@ -753,10 +686,6 @@ Changelog for the HA History Explorer Card.
 - *Export ▸ History*, *Statistics ▸* and each period say how many of the entities exported have data over the window, at least in part — from what the card has loaded and Home Assistant's recorder (the hourly, daily, weekly and monthly statistics from the same long-term ones; the 5-minute ones kept as long as the history); what isn't known yet asked quietly in the background —, a line greyed when none has
 - In *Export ▸ Statistics ▸*, a period the cache holds over the whole window in bold, the one chosen last in italic (it was in bold)
 - Tests (`features`, `settings`): an export from the cache asking nothing, one completing it, the counts and the greyed lines, bold and italic; *Export ▸ History* with its count
-
-### Changed — docs
-- README_Full: *The automatic scale* (Y axis scaling), *Drawn at once, then refined*, *Ahead*, *A reasonable cache* (Long term statistics) and the table of what is loaded; the options' tables and `full-reference-config.yaml`: `yScaleSteadiness`; ARCHITECTURE.md: `card-yscale.js`, the cache (each entity once, however it's used; the background's one rule, the angles' history first of it; the CSV export from it)
-- README, README_Full: no longer say the CSV export doesn't work in the HA Companion app — it works there
 
 ## [v1.2.59] - 2026-11-05
 
@@ -790,9 +719,6 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed — `defaultTimeRange` in hours
 - A number of hours took the range after the one that holds it (`36h`: 3 days); now the shortest range at least that long (`36h`: 2 days)
-
-### Changed — docs
-- README_Full: *What is kept, and where* — the persistence options' defaults, and what each value obeys, on this device and on every device; `enableMultidevicePersistence` is the sync across devices (a value never synced is kept on this device by `enablePersistence` only)
 
 ### Tests
 - New suite `smart`: the smart line mode where the curve is drawn from statistics
@@ -830,7 +756,6 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed — showUnavailable had no effect on a curve
 - `showUnavailable: true` let an unavailable or unknown state through, but as a number it was none, and the curve went over it as without the option. It now shows a gap there: the value before held until it, nothing until the next value (`_withGaps`); a state a `stateMap` doesn't list has no value either (`STATE_NOT_LISTED`), a gap with `showMissingState`
-- README_Full: *Line graphs and unavailable data* and *Text states as a curve* — a state not listed has no value, the curve over it by default, a gap with `showMissingState`
 
 ### Fixed — an entity saved again in another order taken for a change
 - A device loading the card took an entity of Home Assistant's (or of the YAML) for changed when its fields were only written in another order — the last one to speak heard where nobody spoke. Entries are compared by what they say: their fields in any order, an undefined one as absent, from another device without the fields kept on each device (`sameEntry`)
@@ -867,9 +792,6 @@ Changelog for the HA History Explorer Card.
 ### Fixed — a timeline's first row under the icons
 - The rows of a timeline or an arrowline filling the graph (3 rows and more by default) started right under the handle, the padlock and the close button, which covered the first row's label. They are now moved down by 5 px, the graph 5 px higher (`rowsTopRoom`); with fewer rows, there was room already and nothing changes
 - Test (`features`): 3 rows, a timeline and an arrowline, moved down by 5 px; a single row, as it was
-
-### Changed — the 1.2 line out of beta
-- README: the history explorer part of the card is stable; the mini-graph-card part is in beta
 
 ### Tests
 - The mock of Home Assistant gives an empty string for a translation it doesn't have, as Home Assistant does — it gave the key itself, shown in the timelines' rows
@@ -947,7 +869,6 @@ Changelog for the HA History Explorer Card.
 - The glass larger (its ring's outer radius 8.5, inner 6.5, of a 20-unit icon), its handle shorter; the symbol (↔ ↕ ⤢ − +) a little larger, just over the ring; the arrowheads smaller
 
 ### Changed — the documentation's images
-- Every image of README.md and README_Full.md redone with the current card, its scenes kept; new ones for the menus (a curve's, a graph's, a timeline row's, the options menu, the type menu of an entity being added, an entity's attributes), drag and drop (a curve onto another graph, a graph, a timeline row, the Y axis), the tooltip and two Y axes. The images are stored on `main` (`images/screenshots/`), the READMEs pointing there
 - `tools/docs-images/`: the scripts rendering them (the built card against the tests' mocked Home Assistant, realistic entities and histories): `node tools/docs-images/render.cjs [scene…]`
 
 ### Added — *Tests (beta) ▸ Pen events*: what may tell a pen reported as a mouse
@@ -986,7 +907,6 @@ Changelog for the HA History Explorer Card.
 ### Changed — the options' base names
 - An option grouped in a block — `tooltip:`, `timeTicks:`, `uiColors:`… — has its block as its base name, every other spelling a synonym, converted where the options are read (`normalizeOptions`), the base name winning when both are written: `tooltip.size` (`tooltipSize`), `tooltip.showDuration` (`tooltipShowDuration`), `tooltip.showColorsLine` / `showColorsTimeline` (`showTooltipColorsLine` / `Timeline`), `timeTicks.density` (`timeTickDensity`); in camelCase, `uiColors.gridLines` / `cursorLine` (`gridlines` / `cursorline`). A curve's tooltip options join the `tooltip:` block, at every level (card, graph, entity, `entityOptions`): `tooltip.largeScreen`, `tooltip.smallScreen`, `tooltip.behavior` (`largeScreenTooltip`, `smallScreenTooltip`, `tooltipBehavior`, and their snake_case spellings). `enablePersistence` and `enableMultidevicePersistence` in camelCase (`enable_persistence`, `enable_multidevice_persistence`). Nothing to change in a configuration: every former spelling keeps working; nothing saved changes (the persistence keeps values, never these names)
 - The theme's colors (`uimode`, `uiColors`) read with the other options (`applyTheme` reads them there)
-- README, README_Full, full-reference-config.yaml: the base names, their synonyms in the options table
 - Test (`options`): each former spelling gives the same values as the base name, the base name winning when both are written; `tooltip.behavior`, `tooltip.largeScreen` on a graph, an entity, in `entityOptions`
 
 ### Changed — the toolbar's spacing
@@ -995,29 +915,20 @@ Changelog for the HA History Explorer Card.
 - The three magnifiers (the box's, − and +) 20 px wide (18 before), their symbols (↔ ↕ ⤢, − +) larger and bolder; under a mouse or a pen above the screen, a magnifier shown twice as large, over its neighbours, the toolbar unchanged — to see what is clicked (`rangeControlsHtml`, `magnifierSvg`)
 - Test (`features`): each magnifier 20 px, 40 px under the mouse, the toolbar unchanged
 
-### Changed — the documentation
-- README.md rewritten short: each section what a user needs, then a 📖 link to its section of README_Full.md; the narrow card under UI configuration; the info panel turned on by its switch or `defaultInfoPanel` (`infoPanel:` is its own options)
-- README_Full.md reorganized: *Tooltip* and *Menus* sections under *Usage*; *Persistence* a section of its own (with the persistence of each entity); *A narrow card* under *Configuring the UI*; *Custom data processing functions* under *Entity options*; `showLine` and `fixedValue` under *Line modes*; the attributes as a list; the options table covering the card's own options too (`defaultTimeRange`, `labelsVisible`, `hour24`, `show`), synonyms only there; the table of contents regenerated from the headings
-- README_Full.md corrected: a timeline's states named for their device class by default (`stateTextMode: auto`); `defaultTimeRange` restored as the persistence says; the tooltip modes among an entity's persisted fields; the default header (*History explorer* and the version)
-- README_Full.md: removed what didn't help using the card (the differences from upstream, the pinch's dead band, `borderJoinStyle`, why no Fourier interpolation, repeated sentences)
-
 ## [v1.2.48] - 2026-10-28
 
 ### Changed — one tooltip layout, a curve's
 - Bars, timelines and arrowlines show their tooltip as a curve's: its title where its first value comes from — the history, or the statistics and their period — and its time — a value's own, or the time a column of values, a bar or a state covers (its end's date only when it's another day), a state's duration after it with `tooltip.showDuration` —; then a line per value, its color box, its series' name (`tooltip.showLabel`) and its value — a curve's or a bar's in its unit, a timeline's state, an arrowline's value. Before, a timeline's tooltip had its row's name as its title and its state, its start and its end each on a line ("(for …)" untranslated), a bar's its time alone (`_chartTooltips`, `_tooltipTitle`, `_tooltipValue`: one for every type; a bar's samples carry the time they cover)
 - `tooltip.size` for every tooltip (see below); `tooltip.showColorsLine` for every graph but timelines (arrowlines' and bar graphs' tooltips: color boxes as curves')
-- README_Full, full-reference-config.yaml: the tooltip's layout
 - Tests (`points`): a timeline's tooltip — the source and the time its state covers, then its name and its state; a bar's — the source and the time it covers
 
 ### Added — the tooltip's sizes
 - `tooltip.size` acts on every tooltip — a curve's, a bar's, a timeline's, an arrowline's: `full` (the source and the time, then a line per value: its color box, its series' name, its value); `compact` (the time alone as its title; each series' name at its shortest — the legend's last shortened form, its shared prefix removed —, whether the legend is shortened or not); `slim` (no title, one value only — the one pointed at, whatever the tooltip mode —, on one line: its color box, its time and its value; the time without its date when the window is a single day or the time axis shows each day, a span over several days keeping its dates); `auto`, the default — by the card's width: `full` from 600 px, `compact` from 300 px and in the info panel, `slim` below, chosen again when the card's width crosses them (`tooltipSize`, `_chartTooltips`, `_tooltipTime`, `_tooltipDated`; Chart.js option `tooltips.hecFirstOnly`)
 - A timeline's graph at least as high as its tooltip's size: 130 px in `full`, 115 in `compact`, 90 in `slim`
-- README_Full, full-reference-config.yaml, Chart Custom.js.md: the tooltip's sizes
 - Tests (`features`): `auto` at 1000, 450 and 280 px — full, compact (the time, the shortest name), slim (no title, the time without its date, one value only with `all`); a size set, the same at every width
 
 ### Added — tooltipBehavior
 - `tooltipBehavior` (`tooltip_behavior`): changes the default of `largeScreenTooltip` and `smallScreenTooltip` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs (`mixed`, `selected`). At every level, as they are (card, graph, entity, `entityOptions`): read with the options (`normalizeOptions`), the rest of the card knowing only `largeScreenTooltip` and `smallScreenTooltip`
-- README, README_Full, full-reference-config.yaml: `tooltipBehavior`
 - Test (`options`): absent and `auto` — `mixed` on a large screen; a mode on the card (synonym, any case); on a graph, an entity, in `entityOptions`; with `largeScreenTooltip` set
 
 ### Changed — the options' defaults in one place
@@ -1032,18 +943,15 @@ Changelog for the HA History Explorer Card.
 ### Changed — the zoom buttons
 - The `-` and `+` buttons on each side of the time range selector are the magnifiers − and +; the three magnifiers of the same size, a little smaller than before (18 px, `magnifierSvg(mode, color, size)`), side by side; the range selector's text as far from the magnifier − as from its arrow (5 px further left: 15 px before, 10 px after it — now 12 and 12 for "3 Days")
 - The three magnifiers as high as the toolbar's other buttons (30 px), aligned at their top
-- README, README_Full, full-reference-config.yaml: the magnifiers − and +
 - Test (`features`): the toolbar narrowed down to 260 px — with the room the magnifiers leave, the date shortened only below 280 px
 
 ## [v1.2.47] - 2026-10-28
 
 ### Changed — bars, timelines and arrowlines: the tooltip as a curve's
 - Bars, a timeline's and an arrowline's rows follow the tooltip modes as curves do (`largeScreenTooltip`, `smallScreenTooltip`: `selected`, `nearest`, `mixed`, `all`): a hover — or a click — opens the tooltip of the element pointed at (a bar, a segment: the picking rule on its box, the pointer clamped on it), a click puts its series or row in the tooltip mode, and with `all` each other series' or row's element at that time joins it (a timeline: the other rows' states then); away from every element, nothing opened nor moved. No hover dot on them: they're drawn already (Chart.js `_hecPointAt`, `_hecElementAtTime`, `_hecHoverElements`, `_hecTap`; a timeline's or arrowline's datasets get `hecTooltip`)
-- README, README_Full, Chart Custom.js.md: the tooltip on bars, timelines and arrowlines
 
 ### Added — the magnifier's modes
 - A long press on the magnifying glass — or a right click, a pen's button — opens the menu of its modes, each shown by its symbol: the time (↔), the Y axis (↕), both (⤢, the default — as before). The glass shows the mode's symbol (no longer a +). The elastic box is drawn and acts as the mode says: the time only — a band the plot area's height, the time zoomed, the Y axis left —; the Y axis only — a band its width —; both — the box as drawn. A mouse's drag mostly up or down (the box without the magnifier) follows the mode too. Kept as the time range is: on this device, across devices with the range's multi-device persistence (Chart.js option `zoomBoxAxes`; the card's `setZoomBoxMode`, the menu `ez_N`, `magnifierSvg`)
-- README, README_Full, Chart Custom.js.md: the magnifier's modes
 - The menus opened by one function (`_openMenuAt`: its close cancelled, filled, placed relative to its positioned parent, kept on its anchor, given the keyboard) — the type menu, the options menu, the magnifier's; a line can show an icon (`fillMenuItems`: `icon`, its name as its hover text)
 - Tests (`mouse`): a long press on the magnifier — its menu, both marked, the box's mode left off; a right click, the time chosen — ↔ on it, a band drawn up to the plot area's top, the time zoomed, the Y axis as it was; the Y axis chosen — the Y axis zoomed, the time as it was. (`persistence`): the mode kept after a reload and on another device
 - Tests (`points`): a timeline — `nearest`: a hover on a segment, its tooltip; `all`: the other row's state joins it; `selected`: a hover shows nothing, a click puts its row in the tooltip; bars — `nearest`: a hover on a bar, its tooltip (all fail with 1.2.46)
@@ -1052,7 +960,6 @@ Changelog for the HA History Explorer Card.
 
 ### Changed — the hover dot: the value nearest on the curve
 - The hover dot, on the curve picked as before, goes on its value nearest the pointer on the curve: from the place of its line nearest the pointer, following the line as drawn (straight, in steps, a B-spline's arcs), the value at the least length either way — the first one met on either side —, no longer the value nearest as the crow flies (in X and Y): it stays on the stretch of line pointed at — on a stepped curve's plateau, the plateau's value, even where the next one is nearer in X and Y beyond the step (Chart.js `_hecNearestOnCurve`; the line's pieces as drawn shared with `_hecCurveAt`: `_hecDrawnPiece`). The tooltip's first point unchanged: the point pointed at, in X and Y
-- README, README_Full, Chart Custom.js.md, CLAUDE.md: the hover dot's value
 - Test (`points`): a stepped curve, on a plateau where the next value is nearer as the crow flies but further along the line — the dot on the plateau's value (fails with the value nearest in X and Y)
 
 ## [v1.2.45] - 2026-10-27
@@ -1060,7 +967,6 @@ Changelog for the HA History Explorer Card.
 ### Changed — the tooltip's side
 - Beside its point, a tooltip opened by a hover stands behind the pointer's move: reaching a value moving rightward, on its left, and the other way round — decided when it shows a new point, kept while it stays on it; there when it fits, else on the other side, else above or below (as before, when neither side fits). Without a direction — a finger, no hover —, the rule of the plot's halves as before (Chart.js `_hecTooltipXAlign`, read by the tooltip's `determineAlignment`)
 - The gesture engine gives the pointer's horizontal direction as a hover goes (`_hecPointerDirX`): the way it went between its last two hover positions — no hysteresis, which, wider than the gap between two points, would keep a stale direction there (one is kept inactive in the code); forgotten when the pointer leaves the graph, and for a finger
-- README_Full, Chart Custom.js.md: the tooltip's side
 
 ### Fixed — two thick curves close together
 - Since 1.2.44, the picking rule took a line's half width (a point's radius) off its distance to the pointer — a distance its tie-break uses too: two thick curves a few pixels apart (5 px wide, 4 px apart) were seen halfway, none picked, even with the pointer exactly on one — no hover dot there. The size now only widens the margin the nearest must be within (the pointer's precision, plus a line's half width, a point's radius); the distances, and the tie-break, as before 1.2.44 (Chart.js `_hecPickNearest`: a candidate's `size`)
@@ -1073,7 +979,6 @@ Changelog for the HA History Explorer Card.
 - What concerns a curve picks the curve (`_hecCurveAt`, unchanged): the click putting it in the tooltip mode, the long-press showing its points, the hover dot (then its point nearest the pointer, however far)
 - The hover dot, a discreet guide to where the real values are: shown in the tooltip mode too — never on the tooltip's own point, drawn larger —, and by a click or a tap as by a hover (for a pointer without hover): a click on a curve's line far from its values shows the dot of its value nearest (Chart.js `_hecUpdateHoverDot`, `_hecTap`)
 - The picking rule measures the distance to the object itself everywhere: a curve's line, its half width less; a point, its radius drawn less (as a label's or a bar's box)
-- README, README_Full: the tooltip as it works — the value pointed at, real values only
 - Tests (`points`): a click on a curve's line far from its values — the curve selected, no tooltip, the dot of its value nearest; a finger's tap there — the dot, no tooltip, then a tap on that value — its tooltip; a hover there — nothing; a tooltip on a value, then the pointer far from every value — kept there, then faded out; `all` — the other curve's value at the same time joins it, one a few minutes away doesn't. The tests clicking near a curve now click near one of its values
 
 ## [v1.2.43] - 2026-10-27
@@ -1478,9 +1383,6 @@ Changelog for the HA History Explorer Card.
 - A vertical pinch zoomed each Y axis around its own middle: a point above it, under the fingers, went up and off the graph. It now zooms around the fingers' centre: what is under them stays there
 - Test (`touch`): a pinch near the top, the value under the fingers kept
 
-### Docs — the cursor line ([#150](https://github.com/Cook23/history-explorer-card/issues/150))
-- The cursor line — a vertical line following the pointer over a graph — had only its color documented. README_Full has its own section now (`cursor.mode`: `auto`, `all`, `hide`; `cursor.types`: the graph types that show it; `uiColors.cursorline`), with an example lining a timeline up with curves; the README a short paragraph
-
 ## [v1.2.21] - 2026-10-15
 
 ### Fixed — the last one to speak: a change made on another device could be ignored, and overwritten
@@ -1649,10 +1551,6 @@ Changelog for the HA History Explorer Card.
 - A bar graph's legend kept clear of its interval selector from where the selector actually is: its margin assumed the selector against the graph's right edge, 40 px short — hidden until now, a long label going to the next line anyway; a shortened one stayed under the selector
 - The legend's margins (kept clear for the padlock, the handle and the buttons at the graph's top, no taller than its first line) only on its first line: the lines below take the whole width — on a 168 px card, the margins took more room than the labels
 - Tests: the Y labels inside the plot — near them a drag (mouse), a tap then a drag (finger, pen) moves that axis and its curves, left and right, the other one's not; a swipe, a pen's drag don't; a click, a tap, a long press and a hover on a value there are the curve's; the chain icon taking no room, clear of the padlock; a narrow card's controls in boxes over the legend and the rows, a wide card's beside the legend's first line, the units kept, a click and a long-press on the box the controls', on the label beside it the label's; a narrow card's values (the first large, the next small, the statistics smaller; back as before); a 168 px card — the toolbar's lines, nothing out of the card, the Y labels inside (`outside` kept), the time labels apart; the legend at 1000, 300 and 168 px; suite `legend` (the shorter forms)
-
-### Docs — a narrow card and `look: mini` illustrated
-- README and README_Full: a card 168 px wide and `look: mini` at 374 and 168 px (light and dark themes); what a narrow card changes; the gestures along labels drawn inside the plot
-- [mini-graph-card](https://github.com/kalkih/mini-graph-card) linked, and thanked for its good ideas on showing a graph in little room, which this version follows
 
 ### Fixed — the tooltip: closed when a menu opens, its arrow on its point
 - A curve's tooltip still shown (its reading time) stayed over a menu opened then — the options menu, the entity selector's list. Opening any menu of the card now closes it at once and ends its mode (Chart.js `hecEndTooltip`), as an entity's menu already did
@@ -1976,9 +1874,6 @@ Changelog for the HA History Explorer Card.
 - `deps/chart-hec.js`: a gesture the browser takes over ends on the move of that same pointer, no longer on the tooltip's own state
 - Test: a tap the browser takes over, then a hover reported as a mouse (Firefox): the tooltip stays open and follows
 
-### Docs
-- The pen's button is only documented where the browser passes it on (Chrome: a tap with it held, as a right click); hover follows the pen in the browsers that report it
-
 ## [v1.2.2] - 2026-10-04
 
 ### Changed — a label is picked when touched just beside it
@@ -2048,9 +1943,6 @@ Changelog for the HA History Explorer Card.
 
 ### Changed — the Interpolation submenu drawn over the type menu
 - The submenu of the interpolation algorithms opens over the type menu, level with *Interpolation ▸*, its right edge on the menu's right edge: it no longer takes room beside the menu (it opened on the right of the menu, or on its left at the right edge of the screen)
-
-### Changed — the documentation says *Interpolation* everywhere
-- The README, README_Full and the code's comments call the curve algorithms and their submenu *interpolation* everywhere (some still said *reconstruction*), and name the type menu's entries as the menu now shows them (*Smart*, *Curve*…)
 
 ## [v1.1.50] - 2026-10-03
 
@@ -2223,9 +2115,6 @@ Changelog for the HA History Explorer Card.
 ### Fixed — multi-device sync of dynamically added entities
 - With `enable_multidevice_persistence: none` (local memory only), entities added on another device still appeared on this one — they no longer do
 - An entity removed on one device came back on the others at their next reload — a removal is now synced too (an entity this device had seen in HA and that's gone from it was removed elsewhere)
-
-### Fixed — `unit:` set in YAML is now used when deciding whether a new dynamic entity can join an existing graph
-
 
 ## [v1.1.42] - 2026-07-30
 
@@ -2604,7 +2493,6 @@ Changelog for the HA History Explorer Card.
 - `g.ylock` stored on graph object at creation time from `config?.ylock ?? false`
 - Pinch zoom Y start blocked in `pointerDown` when `g.ylock` is set
 - `yAxisPointerUp`: longpress cleanup added; conditional `touch-action` restoration
-- README and README_Full: reorganised with table of contents and intra-document anchor links; README links to README_Full anchors for detailed sections; info-panel promoted to top-level section; corrected `stateTextMode` default (`auto`, not `raw`); corrected `showCurrentValues` default (enabled by default); corrected `ymin`/`ymax` description (initial bounds, not locks); added missing options: `lineWidth`, `stateColorSeed`, `statistics.retention`, `timeTicks.density`, `uiColors.cursorline/selector/closeButton`, `showTimeLabels`, `stacked`; added Buy Me A Coffee button
 
 
 ## [v1.1.25] - 2026-06-02
@@ -2906,3 +2794,4 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.0.51] - 2023-11-24
 Final release from original alexarch21 repository
+
