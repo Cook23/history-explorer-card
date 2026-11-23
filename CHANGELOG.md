@@ -22,7 +22,7 @@ Changelog for the HA History Explorer Card.
 - README_Full.md: a graph's menu, *Add ▸*
 - `deps/Chart Custom.js.md`: the tooltip's side without a direction
 - README.md, README_Full.md, full-reference-config.yaml, `deps/Chart Custom.js.md`: `alignment`, *Appearance ▸ Alignment*; README.md: a graph's menu, *Add ▸*; README_Full.md: the tooltip's side with a finger
-- README.md: the version highlights reviewed — v1.2.88 (an arrowline's extremes), v1.2.37 (a curve's appearance in its menu), v1.2.21 (the calendar) added; v1.2.83, v1.2.82 and v1.2.60 removed (refinements); v1.2.77: the optimisation completed
+- README.md: the version highlights reviewed — v1.2.88 (an arrowline's extremes), v1.2.37 (a curve's appearance in its menu), v1.2.21 (the calendar) added; v1.2.83, v1.2.82 and v1.2.60 removed (refinements); v1.2.77: the optimisation completed; v1.2.0: the complete rewrite
 
 ### Internal
 - Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band; (`graphmenu`): *Add ▸* — an entity added, refused, a second curve, the types the graph takes; (`points`): the tooltip's side from the point shown before; (`graphmenu`): `alignment` and *Appearance ▸ Alignment*; (`yscale`): a locked axis' labels near its ends (`bareEnds`)
