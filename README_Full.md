@@ -600,7 +600,7 @@ A click or a tap near a curve puts it in the tooltip, at the value pointed at �
 
 Once open, the tooltip:
 - **Follows the pointer** — it moves to the value pointed at as the mouse (or a pen held above the screen, in the browsers that report it) moves over the curves; away from every value it stays, and fades out after its reading time;
-- **Stands behind the move** — beside its point, on the side the pointer comes from when there is room (reaching a value moving rightward: on its left), decided when it shows a new value and kept while it stays on it; with a finger, on the side away from the graph's nearest edge; with no room on either side, above or below;
+- **Stands behind the move** — beside its point, on the side the pointer comes from when there is room (reaching a value moving rightward: on its left), decided when it shows a new value and kept while it stays on it; with a finger (no move to follow), on the side it comes from — from the value it showed before (tapping a value further right: on its left) —, for the first one on the side away from the graph's nearest edge; with no room on either side, above or below;
 - **Never moved by a drag** — a drag moves the curves, and an open tooltip with them.
 
 **Which values it shows** — each curve's tooltip mode, set by the screen or by the card's room:

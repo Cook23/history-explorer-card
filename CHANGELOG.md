@@ -21,7 +21,7 @@ Changelog for the HA History Explorer Card.
 - README_Full.md, `deps/timeline.js.md`: an arrowline's arrows and extremes cut at their band
 - README_Full.md: a graph's menu, *Add ▸*
 - `deps/Chart Custom.js.md`: the tooltip's side without a direction
-- README.md, README_Full.md, full-reference-config.yaml, `deps/Chart Custom.js.md`: `alignment`, *Appearance ▸ Alignment*
+- README.md, README_Full.md, full-reference-config.yaml, `deps/Chart Custom.js.md`: `alignment`, *Appearance ▸ Alignment*; README.md: a graph's menu, *Add ▸*; README_Full.md: the tooltip's side with a finger
 
 ### Internal
 - Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band; (`graphmenu`): *Add ▸* — an entity added, refused, a second curve, the types the graph takes; (`points`): the tooltip's side from the point shown before; (`graphmenu`): `alignment` and *Appearance ▸ Alignment*; (`yscale`): a locked axis' labels near its ends (`bareEnds`)
