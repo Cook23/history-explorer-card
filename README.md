@@ -29,13 +29,13 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 ## 📋 Version highlights
 
+- **v1.2.88** — An arrowline's extremes: the spread of the direction around each arrow.
 - **v1.2.84** — Automatic colors by what a curve measures.
-- **v1.2.83** — Color, fill and arrow length from an entity or attribute, chosen in the menus.
-- **v1.2.82** — Arrows as long as an entity's value; the fill read indirectly, as the color.
-- **v1.2.77** — YAML export of the card, a graph or a curve.
-- **v1.2.60** — A steady automatic Y axis; long ranges drawn at once (a year in 0.4 s).
+- **v1.2.77** — YAML export of the card, a graph or a curve; the optimisation completed: 100× faster than the 1.1 branch.
 - **v1.2.59** — Time ranges up to 10 years.
+- **v1.2.37** — A curve's appearance chosen in its menu: color, points, width, line style.
 - **v1.2.27** — Only what the screen can show is loaded.
+- **v1.2.21** — The calendar: a day chosen to show.
 - **v1.2.18** — mini-graph-card's YAML read as is.
 - **v1.2.15** — Gesture settings; the options menu in submenus.
 - **v1.2.9** — Values over a graph, `look: mini`; attributes as curves.
