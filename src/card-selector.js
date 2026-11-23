@@ -221,9 +221,11 @@ export class CardSelector
         // Entity selector-specific: Enter with an entity already selected triggers add
         // regardless of whether the dropdown happens to be open or closed — checked before
         // the generic menu navigation below, which only acts on an open menu.
-        if( event.key === 'Enter' && !_isMenuSelector(idx) && this._entitySelected?.[idx] ) {
+        // (a graph's Add ▸ field: the same — into its graph, graphAddEntered)
+        if( event.key === 'Enter' && ( !_isMenuSelector(idx) || this.addsToGraph(idx) ) && this._entitySelected?.[idx] ) {
             event.preventDefault();
-            this.addEntitySelected(idx);
+            if( _isMenuSelector(idx) ) this.graphAddEntered(idx);
+            else this.addEntitySelected(idx);
             return;
         }
 
@@ -239,7 +241,7 @@ export class CardSelector
                 // Entity selector-specific: a wildcard pattern selects every currently
                 // visible entity at once, instead of activating a single item (a menu's
                 // selector chooses one series: never)
-                if( !_isMenuSelector(idx) && input.value.indexOf('*') >= 0 ) {
+                if( ( !_isMenuSelector(idx) || this.addsToGraph(idx) ) && input.value.indexOf('*') >= 0 ) {
                     const visible = Array.from(dropdown.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
                     const ids   = visible.map(a => a.dataset.entity);
                     const names = visible.map(a => a.dataset.label);
@@ -743,6 +745,17 @@ export class CardSelector
         // (over graph g: centered on it by Chart.hecUi — no coordinates)
         if( !_ir && g ) return this.showMessage(text, null, null, 'center', g.canvas);
         this.showMessage(text, _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2, _ir ? _ir.top : 0, 'center', this.ui.inputField[ii] ?? document.body);
+    }
+
+    // The entities a wildcard took in a graph's Add ▸ field idx (Enter again, as the card's —
+    // see addEntitySelected): added to its graph (graphAddChosen)
+    graphAddEntered(idx)
+    {
+        const _input = this._this.querySelector(`#b7_${idx}`);
+        const ids = ( _input?.dataset.entityId ?? '' ).split(';').map(s => s.trim()).filter(id => id && this.stateOf(id) !== undefined);
+        if( _input ) delete _input.dataset.entityId;
+        if( this._entitySelected ) this._entitySelected[idx] = false;
+        if( ids.length ) this.graphAddChosen(this._menuSource.m, ids);
     }
 
     addEntitySelected(ii)

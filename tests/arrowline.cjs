@@ -225,11 +225,11 @@ module.exports = async function()
             const discs = r.sec.filter(x => Math.abs(x[3]) < 1e-3 && Math.abs(x[4] - 2 * Math.PI) < 1e-3 && x[0] === 0 && x[1] === 0);
             return discs.length > 5 && discs.every(x => x[2] === 12) && r.a.length > 0 ? true : JSON.stringify({ discs: discs.length, sec: r.sec.slice(0, 2), a: r.a.length });
         });
-        await t.step('the arrows and their extremes cut at the graph\'s area — the arrows, the sectors and the whole disc drawn within a clip of the chart area', async () => {
+        await t.step('the arrows and their extremes cut at their band — the arrows, the sectors and the whole disc drawn within a clip of the band: the chart area\'s width, the band\'s height', async () => {
             const clipped = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, ctx=c.ctx, A=c.chartArea, r={ inClip: 0, outClip: 0, arrowsInClip: 0, arrows: 0 }, o={ rect: ctx.rect, clip: ctx.clip, save: ctx.save, restore: ctx.restore, fill: ctx.fill };
                 let last=null, depth=0, clipAt=-1;
                 ctx.rect=function(...a){ last=a; return o.rect.apply(this,a); };
-                ctx.clip=function(...a){ const ok=last && Math.abs(last[0]-A.left)<0.5 && Math.abs(last[1]-A.top)<0.5 && Math.abs(last[0]+last[2]-A.right)<0.5 && Math.abs(last[1]+last[3]-A.bottom)<0.5; if( ok ) clipAt=depth; return o.clip.apply(this,a); };
+                ctx.clip=function(...a){ const ok=last && Math.abs(last[0]-A.left)<0.5 && Math.abs(last[0]+last[2]-A.right)<0.5 && Math.abs(last[3]-30)<0.5 && Math.abs(last[1]+15-c.getDatasetMeta(0).data[0].getMidPosition())<0.5; if( ok ) clipAt=depth; return o.clip.apply(this,a); };
                 ctx.save=function(){ depth++; return o.save.call(this); };
                 ctx.restore=function(){ if( clipAt===depth ) clipAt=-1; depth--; return o.restore.call(this); };
                 ctx.fill=function(...a){ const light=/0[.]3[)]$/.test(String(this.fillStyle)); if( a.length ) { r.arrows++; if( clipAt>=0 ) r.arrowsInClip++; } else if( light ) { if( clipAt>=0 ) r.inClip++; else r.outClip++; } return o.fill.apply(this,a); };

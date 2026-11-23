@@ -29,20 +29,18 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 ## 📋 Version highlights
 
-- **v1.2.84** — Automatic colors by what a curve measures.
-- **v1.2.83** — Color, fill and arrow length from an entity or attribute, chosen in the menus.
-- **v1.2.82** — Arrows as long as an entity's value; the fill read indirectly, as the color.
-- **v1.2.77** — YAML export of the card, a graph or a curve.
-- **v1.2.60** — A steady automatic Y axis; long ranges drawn at once (a year in 0.4 s).
-- **v1.2.59** — Time ranges up to 10 years.
-- **v1.2.27** — Only what the screen can show is loaded.
+- **v1.2.88** — An arrowline's extremes: the spread of the direction around each arrow.
+- **v1.2.77** — YAML export; optimization stage end (up to 50× faster).
+- **v1.2.40** — Tooltip modes by screen size: selected curves, nearest, mixed or all.
+- **v1.2.37** — A curve's appearance chosen in its menu: color, points, width, line style.
+- **v1.2.21** — The calendar: a day chosen to show.
 - **v1.2.18** — mini-graph-card's YAML read as is.
 - **v1.2.15** — Gesture settings; the options menu in submenus.
 - **v1.2.9** — Values over a graph, `look: mini`; attributes as curves.
 - **v1.2.6** — The graph menu, cut and paste.
 - **v1.2.4** — Two Y axes; colors from thresholds or another entity; the info panel everywhere.
 - **v1.2.2** — The curve menu in submenus; the tooltip on a click.
-- **v1.2.0** — Beta: dragging on touch screens reworked.
+- **v1.2.0** — Complete rewrite: cleaner code, new performance and features.
 
 📖 [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md)
 
@@ -245,7 +243,7 @@ graphs:
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png" alt="A curve's menu, Appearance open" width="918">
 
 - **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style; an arrow's length), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
-- **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
+- **A graph's menu** — a long press on its ⠿ zone: *Add ▸* (an entity added to that graph), the same for all its curves (*Export ▸* theirs), *Appearance ▸ Alignment ▸* (*Left*, *Justified*: the graphs' time lined up with a right Y axis), and *Cut* / *Delete the graph*.
 - **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV, YAML), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
 
 A choice made in a menu applies to every curve it concerns: the last one made wins, whatever its level.
@@ -584,6 +582,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels — see *1 |
 | **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *1 |
 | **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *1 |
+| **`alignment`** | **Default** `left`<br>`justified`: the room of a right Y axis kept when another graph of the card has one — the graphs' time lined up — see *1 |
 | **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px<br>The Y labels `inside` the plot, or `outside` — see *1 |
 | **`axisAddMarginMin` / `axisAddMarginMax`** | **Default** `false`<br>`true`: room added under / over a line graph's values, for curves going past them — *the card's only* |
 

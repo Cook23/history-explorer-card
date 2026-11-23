@@ -37,11 +37,11 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: display (open), appearance, interpolation, behavior (the tooltip, the Y axis — its lock, a switch, in it —, cut)', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: add, display (open), appearance, interpolation, behavior (the tooltip, the Y axis — its lock, a switch, in it —, cut)', async () => {
         await graphMenu('rain');
         const m = await menu(); await click('behavior'); const l = await menu();
-        return m === 'rain || Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
-            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* | Export ▸ || Tooltip ▸ | Y axis ▸ | Cut' ? true : `${m} / ${l}`;
+        return m === 'rain || Add ▸ | Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
+            && l === 'rain || Add ▸ | Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* | Export ▸ || Tooltip ▸ | Y axis ▸ | Cut' ? true : `${m} / ${l}`;
     });
     await t.step('reopened within 10 s of being closed, a menu opens the submenu it had open; later, its default one', async () => {
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
@@ -304,6 +304,57 @@ module.exports = async function()
         return r.every((x, i) => x === want[i]) ? true : JSON.stringify(r);
     });
     done(await t.close());
+
+    // ── Add ▸: an entity added to a graph from its menu ──
+    t = await openCard(card({ graphs: GRAPHS }), { height: 1600, mock: { series: true } });
+    await t.wait(800);
+    await t.step('Add ▸ first: an entity added to this graph — the card\'s field, then the types the graph takes; one it shows already refused; one in another graph, Cancel or Second curve, into this graph; a state that isn\'t a number refused but on a timeline', async () => {
+        const add = async (name, text, eid) => { await graphMenu(name); await click('add'); await t.page.click('#et_0_add_field input'); await t.page.keyboard.type(text); await t.wait(500);
+            await t.E(`[...el.querySelectorAll('#es_2 a')].find(a=>a.dataset.entity==='${eid}').click()`); await t.wait(500); };
+        const close = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400); };
+        // (the last submenu open: its lines and fields)
+        const last = () => t.E(`(()=>{ const shown=a=>a.style.display!=='none'; const sub=[...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(shown).pop();
+            return sub ? [...sub.querySelectorAll('a')].filter(shown).map(a=>a.textContent).join(' | ') : ''; })()`);
+        const choose = label => t.E(`[...el.querySelectorAll('[id^="et_0"] a')].find(a=>a.textContent==='${label}' && a.offsetParent).click()`).then(() => t.wait(800));
+        const r = {};
+        await graphMenu('rain'); r.first = ( await menu() ).split(' || ')[1].split(' | ')[0]; await close();
+        await add('rain', 'gas', 'sensor.gas'); r.types = ( await menu() ).split(' || ')[2]; await choose('Curve'); r.added = await layout(); await close();
+        await add('rain', 'gas', 'sensor.gas'); r.here = await last(); r.hereLayout = await layout(); await close();
+        await add('rain', 'tank', 'sensor.tank'); r.dup = await last(); await click('add_second'); await choose('Curve'); r.second = await layout(); await close();
+        await add('rain', 'binary_sensor.b', 'binary_sensor.b'); r.cant = ( await menu() ).split(' || ')[1]; r.cantLayout = await layout(); await close();
+        await add('a', 'binary_sensor.b', 'binary_sensor.b'); r.timeline = ( await menu() ).split(' || ')[2]; await close();
+        const L = 'power+power_kw | a | rain+gas | tank';
+        return r.first === 'Add ▸' && r.types === 'Smart | Curve | Straight | Stepped | Bar' && r.added === L && r.hereLayout === L && r.dup === 'Cancel | Second curve'
+            && r.second === 'power+power_kw | a | rain+gas+tank | tank' && /^Add ▸/.test(r.cant) && r.cantLayout === r.second && r.timeline === 'Timeline' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── Alignment: justified — a graph without a right Y axis keeps the room of one when another graph of the card has one ──
+    for( const [align, right] of [['left', true], ['justified', true], ['justified', false]] ) {
+        t = await openCard(card({ alignment: align, graphs: [
+            { type: 'line', entities: [{ entity: 'sensor.power' }, ...( right ? [{ entity: 'sensor.rain' }] : [] )] },
+            { type: 'line', entities: [{ entity: 'sensor.tank' }] },
+            { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind' }] } ] }), { height: 1600, mock: { series: true } });
+        await t.wait(1500);
+        await t.step(`alignment: ${align}, ${right ? 'a graph with a right Y axis' : 'none with a right Y axis'}: ${align === 'left' ? 'the others as wide as their own axes leave them' : right ? 'every graph — a timeline, an arrowline — ending where it ends' : 'no room kept'}`, async () => {
+            const r = await t.E(`el.instance.graphsInDisplayOrder().map(g=>Math.round(g.chart.chartArea.right))`);
+            const ok = align === 'justified' && right ? r.every(x => x === r[0]) : r.slice(1).every(x => x === r[1]) && ( right ? r[0] < r[1] : r[0] === r[1] );
+            return ok ? true : JSON.stringify(r);
+        });
+        if( align === 'left' ) await t.step('Appearance ▸ Alignment ▸ in a timeline graph\'s menu: Left in bold; Justified chosen — saved on its entities, the timeline ending where the right axis\'s graph ends', async () => {
+            const sub = () => t.E(`(()=>{ const s=[...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(x=>x.style.display!=='none').pop(); return s?[...s.querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '):''; })()`);
+            await t.longPress(await t.E(`moPt(2)`)); await t.wait(500);
+            await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(400);
+            await t.E(`el.querySelector('#et_0_appearance_alignment').click()`); await t.wait(400);
+            const r = { list: await sub() };
+            await t.E(`[...el.querySelectorAll('[id^="et_0_"] a')].find(a=>a.textContent==='Justified'&&a.offsetParent).click()`); await t.wait(1200);
+            r.rights = await t.E(`el.instance.graphsInDisplayOrder().map(g=>Math.round(g.chart.chartArea.right))`);
+            r.saved = await t.E(`el.instance.graphsInDisplayOrder()[2].entities.map(e=>e.alignment).join()`);
+            return r.list === 'Left* | Justified' && r.rights[2] === r.rights[0] && r.rights[1] > r.rights[0] && r.saved === 'justified' ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
 
     return { passed, failed };
 };

@@ -327,7 +327,8 @@ the CHANGELOG is the traceability:
 |---|---|
 | README.md, README_Full.md | How to use the card **as it is now**. Never what changed, when, or what it was before: no version number, no "(1.2.25)", "since 1.2.23", "now", "no longer", "was", "is ignored since". An option kept only for compatibility is described as it is today ("accepted, no effect"), without its history. |
 | "📋 Version highlights" (README.md, before the table of contents, formatted as lowpass_dt's — the only place in a README naming versions; README_Full links to it, it is never deleted) | **When each important feature appeared, usable.** One line per important feature, at the one version where it first worked and could be used — never a range of versions. Not the versions before it (not usable yet), not the ones after it (refinements, more options, bug fixes, polish: the feature didn't really change). A version of bug fixes and refinements only has no line at all. Only the versions of its own branch (1.1 on `v1.1-legacy`, 1.2 on `v1.2-dev`, never mixed). |
-| CHANGELOG.md (and the release notes) | **Everything, version by version**: every change, fix, refinement — the full traceability. |
+| CHANGELOG.md | **Everything the code does differently, version by version**: every change, fix, refinement — the full traceability. Never the documentation's updates (README.md, README_Full.md, `deps/*.md`, full-reference-config.yaml, images…): no `### Docs` section, no line about a doc (set by the user). |
+| The release notes | The version's CHANGELOG section without its Tests lines, **and** its documentation's updates — the only place they are told. |
 
 Before adding a version to the highlights, ask: does it bring an important feature that
 wasn't usable before? If it only improves, extends or fixes one already there — no line.

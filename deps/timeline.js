@@ -980,10 +980,10 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
 
         let j = 0;
 
-        // (the arrows and their extremes cut at the chart's area)
+        // (the arrows and their extremes cut at their band — the chart's width, the band's height)
         ctx.save();
         ctx.beginPath();
-        ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+        ctx.rect(area.left, y0 - 3, area.right - area.left, ARROW_BOX + 6);
         ctx.clip();
 
         for( let i = 0; i < n; i++ ) {

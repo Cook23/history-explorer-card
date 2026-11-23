@@ -561,7 +561,8 @@ module.exports = async function()
     done(await t.close());
 
     // ── The tooltip's side beside its point: behind the pointer's move, decided when it shows a
-    // new point (the gesture engine's direction); a finger: the half of the plot it's in ──
+    // new point (the gesture engine's direction); a finger: the way from the point shown before,
+    // else the half of the plot it's in ──
     const side = () => t.E('graphAt(0).chart.tooltip._view.xAlign');
     t = await sparse('nearest', {}, { ymax: '~1000' });
     await t.wait(800);
@@ -579,7 +580,7 @@ module.exports = async function()
     done(await t.close());
     t = await sparse('selected', { touch: true }, { ymax: '~1000' });
     await t.wait(800);
-    await t.step('a finger (no hover, no direction): the tooltip beside its point as the half of the plot it\'s in says', async () => {
+    await t.step('a finger (no hover, no direction), no tooltip shown before: the tooltip beside its point as the half of the plot it\'s in says; the second tap, further right: on its left, as the half says too', async () => {
         const v = await vals(0);
         const r = [];
         for( const p of [v[0], v[v.length - 1]] ) {
@@ -588,6 +589,16 @@ module.exports = async function()
         }
         // (the left half: the tooltip on the point's right — xAlign 'left')
         return r.every(x => x.side === (x.left ? 'left' : 'right')) ? true : JSON.stringify(r);
+    });
+    await t.step('a finger, a tooltip shown before: the way from that point to this one — two taps in the left half, the second further right: the tooltip on its left, not as the half says', async () => {
+        const v = await vals(0);
+        const half = p => t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea; return ${p.x} - c.canvas.getBoundingClientRect().left <= (A.left + A.right) / 2; })()`);
+        const r = { firstLeft: await half(v[0]), secondLeft: await half(v[1]) };
+        await t.tap({ x: v[0].x, y: v[0].y + v[0].in }); await t.wait(500);
+        await t.tap({ x: v[1].x, y: v[1].y + v[1].in }); await t.wait(500);
+        r.side = await side();
+        // (xAlign 'right': the box's right edge at the point — the tooltip on its left)
+        return r.firstLeft && r.secondLeft && v[1].x > v[0].x && r.side === 'right' ? true : JSON.stringify(r);
     });
     done(await t.close());
     t = await sparse('all');

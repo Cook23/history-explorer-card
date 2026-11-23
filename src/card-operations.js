@@ -44,10 +44,17 @@ export class CardOperations
     typeInto(src, idx, tgt)
     {
         const _e = src.entities[idx];
-        const _type = _e.type ?? src.type;
-        if( typesCompatible(_type, tgt.type) ) return { type: _type, lineMode: _e.lineMode };
-        if( !this.isNumericEntity(_e.entity) ) return tgt.type === 'timeline' ? { type: 'timeline', lineMode: null } : null;
-        const _det = this.detectDefaultType(_e.entity);
+        return this.shownIn(_e.entity, _e.type ?? src.type, _e.lineMode, tgt);
+    }
+
+    // How series id, as type (lineMode), is shown in graph tgt — the rule of typeInto: as it
+    // is when tgt can; else, a number, its own default when that one fits, else tgt's type; a
+    // state that isn't a number only on a timeline → { type, lineMode }, null when tgt can't
+    shownIn(id, type, lineMode, tgt)
+    {
+        if( typesCompatible(type, tgt.type) ) return { type, lineMode };
+        if( !this.isNumericEntity(id) ) return tgt.type === 'timeline' ? { type: 'timeline', lineMode: null } : null;
+        const _det = this.detectDefaultType(id);
         if( typesCompatible(_det.type, tgt.type) ) return _det;
         return { type: tgt.type === 'bar' ? 'line' : tgt.type, lineMode: _det.lineMode };
     }
@@ -273,21 +280,44 @@ export class CardOperations
         const _names = ids.map(id => {
             const _numeric = this.isNumericEntity(id);
             const _det = _numeric && type === 'default' ? this.detectDefaultType(id) : null;
-            return this._addCurve(id, !_numeric ? 'timeline' : _det ? _det.type : type, !_numeric ? null : _det ? _det.lineMode : lineMode);
+            return this._addCurve(id, !_numeric ? 'timeline' : _det ? _det.type : type, !_numeric ? null : _det ? _det.lineMode : lineMode).name;
         });
         this.updateHistory();
         this.writeLocalState();
         return _names;
     }
 
-    // One brand-new curve of series id, as type (lineMode); → its name. (addGraph registers
-    // its entry itself, adopting the group of the graph it joins, if any)
-    _addCurve(id, type, lineMode)
+    // Brand-new curves of series ids added to graph g (its menu's Add): as type (lineMode) —
+    // 'default', each one's own —, shown as g can show them (shownIn, as a curve dragged onto
+    // it); one g can't show, or g shows already, not added → their names
+    addCurvesTo(g, ids, type, lineMode)
+    {
+        const _names = [];
+        for( const id of ids ) {
+            if( g.entities.some(e => e.entity === id) ) continue;
+            const _numeric = this.isNumericEntity(id);
+            const _asked = !_numeric ? { type: 'timeline', lineMode: null } : type === 'default' ? this.detectDefaultType(id) : { type, lineMode };
+            const _to = this.shownIn(id, _asked.type, _asked.lineMode, g);
+            if( !_to ) continue;
+            // (g rebuilt by each one added: the next one into it as it now is)
+            const _added = this._addCurve(id, _to.type, _to.lineMode, g);
+            _names.push(_added.name);
+            if( _added.g ) g = _added.g;
+        }
+        this.updateHistory();
+        this.writeLocalState();
+        return _names;
+    }
+
+    // One brand-new curve of series id, as type (lineMode) — into graph `into`, else where
+    // addGraph puts it; → { name, g: the graph showing it }. (addGraph registers its entry
+    // itself, adopting the group of the graph it joins, if any)
+    _addCurve(id, type, lineMode, into = null)
     {
         const _entry = { type, lineMode };
         const _copy = this.store.newCopy(id);
         if( _copy ) _entry.copy = _copy;
-        this.addGraph(id, { entry: _entry });
+        this.addGraph(id, { entry: _entry, into });
         const _g = this.graphs.find(g => g.entities.includes(_entry));
         if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {
             // (a brand-new graph: a group of its own)
@@ -295,7 +325,7 @@ export class CardOperations
             _g.groupId = _gid;
             _g.entities.forEach(e => { e.groupId = _gid; });
         }
-        return this.stateOf(id)?.attributes?.friendly_name || id;
+        return { name: this.stateOf(id)?.attributes?.friendly_name || id, g: _g ?? null };
     }
 
     // Entity idx of graph g deleted for good — its graph rebuilt with the others (removed
@@ -451,6 +481,9 @@ export class CardOperations
         // (the points: only their size changes — shown on the graph as it is, never built again:
         // the curves in the tooltip mode, the tooltip open, the point hovered kept)
         if( field === 'showPoints' ) this.showCurvePoints(g, entities, value); else this.rebuildInPlace(g);
+        // (an alignment, a Y axis' side — a right one now, or none: the right room of every
+        // graph worked out again — see applyTimeAxis)
+        if( field === 'alignment' || field === 'yAxis' ) this.applyTimeAxes();
         this.writeLocalState();
     }
 

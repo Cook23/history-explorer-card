@@ -4,6 +4,7 @@
 // history-explorer-card.js).
 
 import { RIGHT_Y_AXIS } from "./card-charts.js";
+import { maxOf } from "./history-arrays.js";
 import { paintMagnifier } from "./card-menus.js";
 import { perf } from "./card-perf.js";
 import { ZOOM_BOX_MODES, OPTION_DEFAULTS, TICK_DENSITIES, TIME_RANGES, MAX_RANGE_YEARS, YEAR_HOURS } from "./history-options.js";
@@ -460,10 +461,13 @@ export class CardTimeRange
     // the only place a graph's time axis is set (a time range set applies it: setStepSize)
     applyTimeAxis(g)
     {
-        // (linked graphs keep their time aligned: when one of them has a right Y axis, the
-        // others keep the room of one — Chart.js hecRightAxisRoom)
-        const _hasRight = x => x.chart.options.scales.yAxes.some(a => a.id === RIGHT_Y_AXIS);
-        g.chart.options.hecRightAxisRoom = g.groupId != null && this.graphs.some(x => x !== g && x.groupId === g.groupId && _hasRight(x));
+        // (the room of a right Y axis kept on its right — Chart.js hecRightAxisRoom, px —, when it
+        // has none: as wide as theirs, when one of its linked graphs has one — their time
+        // aligned —, or, aligned justified (alignment), when another graph of the card has one)
+        const _right = x => Math.max(0, maxOf(x.chart.options.scales.yAxes.filter(a => a.id === RIGHT_Y_AXIS && a.display !== false).map(a => a.hecWidth ?? 0)));
+        const _justified = this.resolveOption(g.entities[0], 'alignment') === 'justified';
+        const _with = this.graphs.filter(x => x !== g && ( _justified || ( g.groupId != null && x.groupId === g.groupId ) ));
+        g.chart.options.hecRightAxisRoom = Math.max(0, maxOf(_with.map(_right)));
         const _time = g.chart.options.scales.xAxes[0].time;
         _time.unit = this.activeRange.tickStepUnit;
         _time.stepSize = this.activeRange.tickStepSize;

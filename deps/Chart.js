@@ -6493,11 +6493,12 @@
             var padding = helpers.options.toPadding(layoutOptions.padding);
             var leftPadding = padding.left;
             // (fork) hecRightAxisRoom: the room of a right Y axis kept on the right of a chart
-            // that has none — its first Y axis' width (hecWidth): the plot of linked charts
-            // aligned (Chart Custom.js.md §1)
+            // that has none — a width (px), or true: its first Y axis' width (hecWidth) —: the
+            // plots of charts aligned (Chart Custom.js.md §1)
             var _yAxes = chart.options.scales && chart.options.scales.yAxes || [];
-            var _room = chart.options.hecRightAxisRoom && !_yAxes.some(function (a) { return a.position === 'right' && a.display !== false; })
-              ? ( _yAxes[0] && typeof _yAxes[0].hecWidth === 'number' ? _yAxes[0].hecWidth : 0 ) : 0;
+            var _r = chart.options.hecRightAxisRoom;
+            var _room = _r && !_yAxes.some(function (a) { return a.position === 'right' && a.display !== false; })
+              ? ( typeof _r === 'number' ? _r : _yAxes[0] && typeof _yAxes[0].hecWidth === 'number' ? _yAxes[0].hecWidth : 0 ) : 0;
             var rightPadding = padding.right + _room;
             var topPadding = padding.top;
             var bottomPadding = padding.bottom;
@@ -13200,7 +13201,7 @@
             // data's. The step applied kept (_hecStep), told once the layout is done
             // (ticks.hecTicksApplied)
             var _hec = Chart.hecAxisTicks ? Chart.hecAxisTicks({ dataMin: tickOpts.dataMin, dataMax: tickOpts.dataMax, min: tickOpts.min, max: tickOpts.max,
-              minRange: tickOpts.hecMinRange, marginMin: tickOpts.hecMarginMin, marginMax: tickOpts.hecMarginMax, stepSize: numericGeneratorOptions.stepSize }, maxTicks, me.min, me.max) : null;
+              minRange: tickOpts.hecMinRange, marginMin: tickOpts.hecMarginMin, marginMax: tickOpts.hecMarginMax, stepSize: numericGeneratorOptions.stepSize, bareEnds: tickOpts.hecBareEnds }, maxTicks, me.min, me.max) : null;
             var ticks = me.ticks = _hec || Ticks.generators.linear(numericGeneratorOptions, me);
             me._hecStep = _hec ? _hec.step : numericGeneratorOptions.stepSize > 0 ? numericGeneratorOptions.stepSize
               : ticks.length > 2 ? +( ticks[ticks.length - 2] - ticks[ticks.length - 3] ).toPrecision(12) : undefined;

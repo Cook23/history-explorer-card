@@ -259,6 +259,9 @@ graphs:
     # The right Y axis' labels (show_labels_secondary), the same way
     labelsRight: True
 
+    # left (default), or justified: the room of a right Y axis kept when another graph of the card has one (the graphs' time lined up)
+    alignment: left
+
     # Step size to display on the Y-axis (automatically calculated by default). See its aliases in README_Full.md
     ystepSize: null
 

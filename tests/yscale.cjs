@@ -148,6 +148,11 @@ module.exports = async function()
                 return { n, bad }; })()`);
             return r.n > 200000 && !r.bad.length ? true : JSON.stringify(r.bad);
         });
+        await t.step('both sides imposed off the step\'s grid, their labels not shown (bareEnds: the Y lock\'s range): a multiple kept a quarter of the labels\' spacing from them — 0.3 to 9.7, 11 ticks: 1 and 9 kept; imposed by the YAML (their labels shown): left out, a label\'s room from them', async () => {
+            const r = await t.E(`(()=>{ const A = window.HXLocal_Chart.hecAxisTicks;
+                return { locked: [...A({ min: 0.3, max: 9.7, bareEnds: true }, 11)], yaml: [...A({ min: 0.3, max: 9.7 }, 11)] }; })()`);
+            return r.locked.join() === '0.3,1,2,3,4,5,6,7,8,9,9.7' && r.yaml.join() === '0.3,2,3,4,5,6,7,8,9.7' ? true : JSON.stringify(r);
+        });
         await t.step('Chart.js charts 40 to 500 px high given these parameters: each axis drawn with the ticks of the rule for the length it is drawn over — never the half height it is laid out at first, nor its box before the half labels above and below are taken off —, the step applied told (ticks.hecTicksApplied)', async () => {
             const r = await t.E(`(()=>{
                 const Chart = window.HXLocal_Chart, bad = [];

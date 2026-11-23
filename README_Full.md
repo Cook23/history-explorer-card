@@ -600,7 +600,7 @@ A click or a tap near a curve puts it in the tooltip, at the value pointed at �
 
 Once open, the tooltip:
 - **Follows the pointer** — it moves to the value pointed at as the mouse (or a pen held above the screen, in the browsers that report it) moves over the curves; away from every value it stays, and fades out after its reading time;
-- **Stands behind the move** — beside its point, on the side the pointer comes from when there is room (reaching a value moving rightward: on its left), decided when it shows a new value and kept while it stays on it; with a finger, on the side away from the graph's nearest edge; with no room on either side, above or below;
+- **Stands behind the move** — beside its point, on the side the pointer comes from when there is room (reaching a value moving rightward: on its left), decided when it shows a new value and kept while it stays on it; with a finger (no move to follow), on the side it comes from — from the value it showed before (tapping a value further right: on its left) —, for the first one on the side away from the graph's nearest edge; with no room on either side, above or below;
 - **Never moved by a drag** — a drag moves the curves, and an open tooltip with them.
 
 **Which values it shows** — each curve's tooltip mode, set by the screen or by the card's room:
@@ -715,8 +715,9 @@ Dragged near the top or bottom edge of the screen, a graph or a curve scrolls th
 #### The graph menu, cut and paste
 
 A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` — or, without one, with the first two words of each curve's name (a word: two letters or digits at least — the `:` of an attribute's curve, `salon : Current…`, is kept but not counted), each start once. It is one zone: a click there toggles the Y axis lock, a drag moves the graph, a long-press opens the menu — so that what a gesture does there is also in a menu:
+- **Add ▸** — an entity added to this graph: the same field as the card's *Add an entity* (its attributes ▸, a `*` pattern and Enter for every entity it shows), then the display types this graph can show it as. The graph takes it as a curve dragged onto it: one the graph already shows, or a state that isn't a number on a graph other than a timeline, is refused (a message says why, the graph outlined); one shown in another graph offers *Cancel* or *Second curve*, as the card's field does;
 - **Display ▸** — open with the menu (*Behavior* for a graph of timelines): the display types that fit every entity of the graph, the one they all share in bold: chosen, every entity of the graph is shown that way, saved with each, and the graph stays one graph, in its place (three curves made a timeline: one timeline of three rows). Not shown for a graph of entities that can only be a timeline;
-- **Appearance ▸** — as in the curve menu, its color aside (but for a graph of arrows), for all the graph's curves at once: a switch on when all of them show it, a value in bold when all of them have it;
+- **Appearance ▸** — as in the curve menu, its color aside (but for a graph of arrows), for all the graph's curves at once: a switch on when all of them show it, a value in bold when all of them have it; and *Alignment ▸* (*Left*, *Justified*: see [Two Y axes](#two-y-axes)), for any graph — a timeline's or arrowline's too;
 - **Interpolation ▸** — the algorithm for all the graph's curves in *Curve* or *Smart* mode (the only ones it applies to), in bold when they all share it; shown when the graph has such a curve;
 - **Behavior ▸** — *Tooltip ▸* and *Y axis ▸* for all its curves — in it, *Locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock) —, *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as two clicks on its × button);
 - **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for the graph's own entities, and *YAML ▸* (*Simplified*, *Complete*): the graph's YAML (see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml)).
@@ -891,6 +892,7 @@ Line and bar graphs have up to two Y axes, one per group of compatible units:
 - **Chosen by hand** — *Behavior ▸ Y axis ▸* in a curve's menu (or a graph's: all its curves) puts it on the left or the right axis, saved with it;
 - **`yAxis`** — `left` or `right` on an entity (or in `entityOptions`) puts it on that side whatever its unit; on a graph or the card, every curve that doesn't set its own — `yAxis: left` on a graph keeps it on one axis, `yAxis: auto` on an entity brings back the choice by unit;
 - **Shared settings** — `ymin`, `ymax` and `ystepSize` apply to both axes. Linked graphs keep the same room on the right when one of them has a right axis, their time aligned.
+- **Graphs aligned** — `alignment: justified` (on the card, in `entityOptions`, on a graph or on an entity, for its graph — or *Appearance ▸ Alignment ▸ Justified* in a graph's menu or the card's): a graph without a right axis keeps the room of one on its right when another graph of the card has one — a timeline's or arrowline's too —, so that every graph's time lines up; when none has a right axis, none keeps any. `left`, the default: a graph takes the room its own axes leave it.
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/two-y-axes.png" alt="A power on the left axis, a temperature on the right one" width="912">
 
@@ -1160,7 +1162,7 @@ A compass arrow graph is the `arrowline` type, for the entities added from the c
 
 The tooltip shows a column of pixels, as a curve's: the direction, then the length, each `min / mean / max` of the column (the value alone when, rounded, the three are the same).
 
-**The extremes** — `showMinMax`, as a curve's band (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range)): from the arrow's base, a light sector of a disc on each side, to the lowest and the highest direction of its zone around its own, its radius the longest length there, in the arrow's color; a whole disc about the arrow's middle where the direction turned a whole turn or more in its zone (the sun's azimuth over several days). Where the arrow's length isn't given, its sectors and its whole disc are 80 % of their size, as the arrow. What goes past the graph's area, an arrow or its extremes, is cut. `max` is the clockwise side, `min` the anticlockwise one; `all` (or `true`) both; `statistics` / `history` both, only where the arrow comes from them.
+**The extremes** — `showMinMax`, as a curve's band (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range)): from the arrow's base, a light sector of a disc on each side, to the lowest and the highest direction of its zone around its own, its radius the longest length there, in the arrow's color; a whole disc about the arrow's middle where the direction turned a whole turn or more in its zone (the sun's azimuth over several days). Where the arrow's length isn't given, its sectors and its whole disc are 80 % of their size, as the arrow. What goes past the arrows' band, an arrow or its extremes, is cut. `max` is the clockwise side, `min` the anticlockwise one; `all` (or `true`) both; `statistics` / `history` both, only where the arrow comes from them.
 
 **The arrows' length** — `arrowLength`, on the card, in `entityOptions`, on a graph or on an entity:
 - not set: every arrow 80 % of its whole length;
@@ -2286,7 +2288,7 @@ What a curve keeps:
 - **The YAML's changes** — a curve of the YAML follows every later change of the YAML, at whatever level, option by option (see "Last one to speak wins" in [Persistence](#persistence)); a curve added from the card isn't the YAML's: a change of the YAML doesn't reach it.
 
 **The graph's own options**, set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins:
-- **Y axes** — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `yScaleSteadiness`, `yScaleSteadinessRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `yLabels`;
+- **Y axes** — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `yScaleSteadiness`, `yScaleSteadinessRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `alignment`, `yLabels`;
 - **The graph** — `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`;
 - **`height` on the card** — the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
@@ -2445,6 +2447,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels, in the curves' unit; without it, the tightest round step whose labels fit — see [Y axis scaling](#y-axis-scaling) |
 | **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, shown; `false`, none, the plot taking their room; `hover`, shown while the pointer is over the graph (3 s after a tap on a touch screen) — see [Y axis scaling](#y-axis-scaling) |
 | **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, shown; `false`, none; `hover`, shown while the pointer is over the graph — see [Two Y axes](#two-y-axes) |
+| **`alignment`** | **Default** `left`<br>`justified`: a graph without a right Y axis keeps the room of one when another graph of the card has one — every graph's time lined up; `left`: the room its own axes leave it — see [Two Y axes](#two-y-axes) |
 | **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px<br>`inside`: the Y labels drawn inside the plot, which then takes the whole width (no label area); `outside`: beside the plot. Without it, inside on a card narrower than 300 px — see [A narrow card](#a-narrow-card) |
 | **`axisAddMarginMin` / `axisAddMarginMax`** | **Default** `false`<br>`axisAddMarginMin: true`: a margin under a line graph's values; `axisAddMarginMax: true`: over them — room for a smooth curve overshooting the values — *the card's only* |
 
