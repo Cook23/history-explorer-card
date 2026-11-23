@@ -30,8 +30,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 ## 📋 Version highlights
 
 - **v1.2.88** — An arrowline's extremes: the spread of the direction around each arrow.
-- **v1.2.84** — Automatic colors by what a curve measures.
-- **v1.2.77** — YAML export of the card, a graph or a curve; the optimisation completed: 100× faster than the 1.1 branch.
+- **v1.2.77** — YAML export; optimization stage end (100× faster than 1.1).
 - **v1.2.59** — Time ranges up to 10 years.
 - **v1.2.37** — A curve's appearance chosen in its menu: color, points, width, line style.
 - **v1.2.27** — Only what the screen can show is loaded.
