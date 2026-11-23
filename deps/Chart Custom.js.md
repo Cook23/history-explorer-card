@@ -129,7 +129,7 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 | `scales.yAxes[].ticks.hecMinRange` | `number` | none | The smallest range a linear axis shows (the card's `yrange`): its free sides — not imposed, see `ticks.dataMin` — widened to it, both evenly, a single one when the other is imposed, never across 0 when the values don't cross it. |
 | `scales.yAxes[].ticks.hecMarginMin` / `ticks.hecMarginMax` | `boolean` | `false` | A free side's margin (the card's `axisAddMarginMin` / `axisAddMarginMax`): a step more where its value is within half a step of the axis' end. An imposed side: none. |
 | `scales.yAxes[].hecWidth` | `number` (px) | none | A vertical axis' width — its labels' column, the plots of the card's charts aligned —, whatever its labels' own (0: none, its labels inside the plot or not shown). |
-| `hecRightAxisRoom` | `boolean` | `false` | A chart with no right Y axis keeps the room of one on its right: its first Y axis' `hecWidth` — linked charts, one of which has a right axis, keep their plots aligned. |
+| `hecRightAxisRoom` | `number` or `boolean` | `false` | A chart with no right Y axis keeps the room of one on its right: that width (px) — `true`, its first Y axis' `hecWidth` —; charts aligned: the card's linked ones, one of which has a right axis, and those it aligns justified (`alignment`). |
 | `scales.xAxes[].time.hecTicksApplied` | `function({ axis, unit, stepSize })` | none | Called once the layout is done, at each update, with the step a time axis was drawn with: its `time.unit` / `time.stepSize`, unless its labels don't fit side by side — then a longer one (§8, *Time scale, `buildTicks`*). |
 
 ### Plugin options (`options.plugins`)

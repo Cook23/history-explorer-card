@@ -63,6 +63,7 @@ const _APPEARANCE = {
     dash:   { field: 'dashMode', label: 'ui.menu.look_dash',
               values: Object.keys(DASH_MODES).map(k => [k, 'ui.menu.dash_' + k]) },
     length: { field: 'arrowLength', label: 'ui.menu.look_length' },
+    alignment: { field: 'alignment', label: 'ui.menu.look_alignment', values: [['left', 'ui.menu.alignment_left'], ['justified', 'ui.menu.alignment_justified']] },
 };
 // The appearance lists also set from an entity (Entity ▸): as it is (Value), or by thresholds
 // on its value (Thresholds ▸) — the options read indirectly (INDIRECT_OPTIONS)
@@ -1102,7 +1103,7 @@ export class CardMenus
     // others, the curves
     _lookByGraph(m, key)
     {
-        const _takes = (g, e) => key === 'fill' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline'
+        const _takes = (g, e) => key === 'fill' || key === 'alignment' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline'
             : key === 'minmax' && g.type === 'arrowline' ? true : this.isCurve(g, g.entities.indexOf(e));
         return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e => _takes(g, e)) }))
             .filter(({ curves }) => curves.length);
@@ -1130,7 +1131,8 @@ export class CardMenus
         const { kind, pairs } = this._scopeOf(m);
         const _one = kind === 'entity' && pairs.length === 1 && pairs[0].entities.length > 0 && pairs[0].g.type !== 'timeline';
         const _arrowsOnly = pairs.length > 0 && pairs.every(({ g }) => g.type === 'arrowline');
-        return Object.keys(_APPEARANCE).filter(k => k === 'color' ? ( _one || _arrowsOnly ) && this._lookByGraph(m, k).length > 0 : this._lookByGraph(m, k).length > 0);
+        return Object.keys(_APPEARANCE).filter(k => k === 'color' ? ( _one || _arrowsOnly ) && this._lookByGraph(m, k).length > 0
+            : k === 'alignment' ? ( kind === 'graph' || kind === 'card' ) && this._lookByGraph(m, k).length > 0 : this._lookByGraph(m, k).length > 0);
     }
 
     // Curve e's value of appearance list key — its points (POINTS_VALUES); its extremes
@@ -1147,6 +1149,7 @@ export class CardMenus
         }
         if( key === 'width' ) return e.width;
         if( key === 'minmax' ) return minMaxValue(e.showMinMax) ?? false;
+        if( key === 'alignment' ) return this.resolveOption(e, 'alignment');
         if( key === 'points' ) { const v = this.resolveOption(e, 'showPoints'); return allPointsShown(v) ? true : v; }
         return this.resolveOption(e, 'dashMode');
     }

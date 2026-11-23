@@ -481,6 +481,9 @@ export class CardOperations
         // (the points: only their size changes — shown on the graph as it is, never built again:
         // the curves in the tooltip mode, the tooltip open, the point hovered kept)
         if( field === 'showPoints' ) this.showCurvePoints(g, entities, value); else this.rebuildInPlace(g);
+        // (an alignment, a Y axis' side — a right one now, or none: the right room of every
+        // graph worked out again — see applyTimeAxis)
+        if( field === 'alignment' || field === 'yAxis' ) this.applyTimeAxes();
         this.writeLocalState();
     }
 

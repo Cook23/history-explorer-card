@@ -584,6 +584,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels — see *1 |
 | **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *1 |
 | **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *1 |
+| **`alignment`** | **Default** `left`<br>`justified`: the room of a right Y axis kept when another graph of the card has one — the graphs' time lined up — see *1 |
 | **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px<br>The Y labels `inside` the plot, or `outside` — see *1 |
 | **`axisAddMarginMin` / `axisAddMarginMax`** | **Default** `false`<br>`true`: room added under / over a line graph's values, for curves going past them — *the card's only* |
 

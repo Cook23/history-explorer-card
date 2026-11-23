@@ -315,6 +315,9 @@ const OPTION_VALUES = {
     // graph — see card-charts.js _chartYAxis)
     labelsLeft    : _labelsShown('labelsLeft'),
     labelsRight   : _labelsShown('labelsRight'),
+    // (a graph's plot: left, as its own axes leave it; justified, the room of a right Y axis
+    // kept when another graph of the card has one — see card-timerange.js applyTimeAxis)
+    alignment     : oneOf('alignment', ['left', 'justified'], { synonyms: { justified: ['justify'] } }),
     // (auto: the legend only when the graph has several labels in it)
     legendVisible : oneOf('legendVisible', [true, false, 'auto']),
     logarithmic   : v => v === true,
@@ -467,6 +470,7 @@ export const OPTION_DEFAULTS = {
     showLine: true, showGraph: true, fixedValue: false, stateAdaptiveColor: true, showIndicator: false, valueFactor: 0,
     // (a graph's — card-graphs.js _optionsInGraph)
     legendVisible: true, showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true, yScaleSteadiness: 50,
+    alignment: 'left',
     // (a graph's header — CardConfig.graphOption)
     showIcon: false, alignHeader: 'center',
     // (a bar graph's interval — CardConfig.applyConfig, defaultInterval)
@@ -542,7 +546,7 @@ export const PERSISTENCE_CATEGORIES = ['range', 'entities', 'order'];
 const _GRAPH_OPTIONS = [...ENTITY_OPTION_KEYS.filter(k => !ENTITY_ONLY_KEYS.includes(k)), 'fill', 'arrowLength', 'arrowMax', 'arrowWeighting', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'sizePoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'alignment', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
     'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor',
     'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'tooltipBehavior'];
@@ -560,7 +564,7 @@ export const GRAPH_STORED_KEYS = _GRAPH_OPTIONS.filter(k => !['interval', 'exclu
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
 export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'barSpacing'];
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'alignment', 'barSpacing'];
 
 // The options the card sets for its curves and its graphs — every curve's (CURVE_OPTION_KEYS,
 // and those copied onto a curve with them: card-graphs.js _levelFields), every graph's
