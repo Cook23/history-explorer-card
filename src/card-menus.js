@@ -7,7 +7,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES, allPointsShown, FILL_VALUES, LINE_WIDTHS, Y_AXIS_SIDES, LINE_MODES, LINE_MODE_LABELS } from "./history-options.js";
+import { typesCompatible, INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES, allPointsShown, FILL_VALUES, LINE_WIDTHS, Y_AXIS_SIDES, LINE_MODES, LINE_MODE_LABELS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
@@ -814,6 +814,7 @@ export class CardMenus
         _menu._menuForGraph = ctx.forGraph;
         _menu._menuFrom     = ctx.from;
         _menu._menuAnchor   = ctx.anchor;
+        _menu._menuAddTo    = ctx.addTo ?? null;
         this._openMenuAt(this._curveMenu(input_idx), at, align, anchorEl);
         this._openRememberedSubmenu(input_idx, sub);
     }
@@ -835,7 +836,9 @@ export class CardMenus
         const _e = entities[0];
         const _label = _menu._menuFrom === 'label' && !!_e;
         const _full = this._cardsCurveMenu(`et_${i}`);
-        const _lines = [this._typeTitle(i), ...this._sectionLines(m)];
+        // (a graph's, in the card: Add ▸ first — an entity added to that graph)
+        const _add = _full && _menu._menuForGraph && g ? [{ ...this._submenuLine(m, `et_${i}_add`, i18n('ui.label.add'), ['add']), lazy: true }] : [];
+        const _lines = [this._typeTitle(i), ..._add, ...this._sectionLines(m)];
         if( _full && _label )
             _lines.push({ id: `et_${i}_info`, label: i18n('ui.menu.entity_info'), choose: () => { this.hideEntityCurveMenu(i); this.openEntityInfo(_e, g); } });
         // (its exports: its curve's, its graph's — as the options menu's, every curve's)
@@ -860,6 +863,7 @@ export class CardMenus
     // A type submenu's lines (path: see _menuOf): a section's, or the graph's exports
     _typeSubmenuLines(i, path)
     {
+        if( path[0] === 'add' ) return this._graphAddItems(this._curveMenu(i), path);
         if( path[0] === 'export' ) {
             const { g, entities } = this._menuTargets(i);
             const _scope = this._this.querySelector(`#et_${i}`)._menuForGraph ? { kind: 'graph', g } : { kind: 'curve', g, e: entities[0] };
@@ -908,6 +912,8 @@ export class CardMenus
         const _menu = m.el();
         const { kind, pairs } = this._scopeOf(m);
         const _id = _menu._menuEntityId, _e = pairs[0]?.entities[0], _g = pairs[0]?.g;
+        // (an entity being added to a graph — its Add ▸ —: only the types that graph takes)
+        const _into = kind === 'add' && _menu._menuAddTo ? this.graphs.find(x => x.id === _menu._menuAddTo) ?? null : null;
         let _numeric, _active, _default = false;
         if( kind === 'graph' || kind === 'card' ) {
             _numeric = pairs.every(({ g }) => g.entities.every(e => this.isNumericEntity(e.entity)));
@@ -921,13 +927,16 @@ export class CardMenus
             _active = d => !_numeric && d.type === 'timeline';
         } else {
             _numeric = this.isNumericEntity(_id);
-            const _detected = _numeric ? this.detectDefaultType(_id) : { type: 'timeline', lineMode: null };
+            let _detected = _numeric ? this.detectDefaultType(_id) : { type: 'timeline', lineMode: null };
+            // (added to a graph: as that graph would show it — shownIn)
+            if( _into ) _detected = this.shownIn(_id, _detected.type, _detected.lineMode, _into) ?? _detected;
             _active = d => d.type === _detected.type && ( d.lineMode === null || d.lineMode === _detected.lineMode );
         }
         const _lines = _default ? [{ id: `${m.prefix}_default`, label: i18n('ui.menu.type_default'), marked: true, final: true,
                                      choose: () => this._typeChosen(m, 'default', null) }] : [];
         for( const [k, d] of _CURVE_MENU_DEFS.entries() ) {
             if( !_numeric && d.type !== 'timeline' ) continue;
+            if( _into && !typesCompatible(d.type, _into.type) ) continue;
             _lines.push({ id: `${m.prefix}_${k}`, label: i18n(d.label), marked: !_default && _active(d), final: true,
                           choose: () => this._typeChosen(m, d.type, d.lineMode) });
         }
@@ -1213,6 +1222,7 @@ export class CardMenus
             // (one field a menu: another Entity ▸'s — of another list, opened before — emptied,
             // so the selector reads this one — see setDropdownVisibility, #b7_k)
             for( const other of _INDIRECT_LOOK ) if( other !== key ) this._this.querySelector(`#${m.prefix}_appearance_${other}_entity_sub`)?.replaceChildren();
+            this._this.querySelector(`#${m.prefix}_add_sub`)?.replaceChildren();
             this._menuSource = { m, key };
             return [{ id: `b7_${k}`, lineId: `${_id}_field`, label: '', input: { text: true, placeholder: i18n('ui.label.type_to_search') }, value: '',
                       bind: el => {
@@ -1237,9 +1247,85 @@ export class CardMenus
     // it opened over the field — Value, Thresholds ▸
     menuSeriesChosen(i, sid)
     {
-        const { m, key } = this._menuSource ?? {};
+        const { m, key, add } = this._menuSource ?? {};
+        if( add ) return this.graphAddChosen(m, [sid]);
         const _line = m && this._this.querySelector(`#${m.prefix}_appearance_${key}_entity_field`);
         if( _line ) this._openSubmenu(m, ['appearance', key, 'entity', seriesOf(sid).entity, sid], _line);
+    }
+
+    // --------------------------------------------------------------------------------------
+    // A graph's Add ▸: an entity added to that graph — the card's selector, the same steps
+    // (its field, its attributes ▸, a wildcard), the graph taking it as a curve dragged onto
+    // it (shownIn): refused when it shows it already or can't show it; one shown in another
+    // graph, Cancel or a second curve; else its display types, those the graph takes
+    // --------------------------------------------------------------------------------------
+
+    // Add ▸'s lines (path ['add']: the entity selector's field, the menu's own — the same as
+    // Entity ▸'s —; ['add', id]: id shown in another graph — Cancel, a second curve)
+    _graphAddItems(m, path)
+    {
+        const [, dup] = path;
+        if( dup !== undefined )
+            return [{ id: `${m.prefix}_add_cancel`, label: i18n('ui.menu.duplicate_cancel'), marked: true, final: true, choose: () => m.close() },
+                    { id: `${m.prefix}_add_second`, label: i18n('ui.menu.duplicate_create'), final: true, choose: () => this._graphAddTypes(m, [dup]) }];
+        const k = this.menuSelector(m.index);
+        // (one field a menu: an Entity ▸'s opened before emptied — see _indirectItems)
+        for( const key of _INDIRECT_LOOK ) this._this.querySelector(`#${m.prefix}_appearance_${key}_entity_sub`)?.replaceChildren();
+        this._menuSource = { m, add: true };
+        return [{ id: `b7_${k}`, lineId: `${m.prefix}_add_field`, label: '', input: { text: true, placeholder: i18n('ui.label.type_to_search') }, value: '',
+                  bind: el => {
+                      this.bindEntitySelector(k, el);
+                      el._wantWidth = () => Math.ceil(this.entityLineWidths().all);
+                  } }];
+    }
+
+    // Is selector idx the field of a graph's Add ▸? (its Enter as the card's: a wildcard
+    // takes every entity it shows — see card-selector.js)
+    addsToGraph(idx)
+    {
+        const s = this._menuSource;
+        return idx >= MENU_SELECTOR && !!s?.add && s.m.index === idx - MENU_SELECTOR;
+    }
+
+    // Series ids chosen in Add ▸ of menu m (a wildcard: several): those its graph shows already,
+    // or can't show (a state that isn't a number elsewhere than on a timeline), refused as a
+    // curve dragged onto it — said, the graph outlined —; one shown in another graph: Cancel
+    // or a second curve (several: left out, said, their graphs outlined, as the card's); the
+    // others, their display types
+    graphAddChosen(m, ids)
+    {
+        const { g } = this._menuTargets(m.index);
+        if( !g ) return;
+        const _line = this._this.querySelector(`#${m.prefix}_add_field`);
+        const _r = _line?.getBoundingClientRect();
+        const _say = text => this.showMessage(text, _r ? _r.left : 0, _r ? _r.bottom : 0, 'left', _line ?? document.body);
+        const _here = ids.filter(id => g.entities.some(e => e.entity === id));
+        const _cant = ids.filter(id => !_here.includes(id) && !this.isNumericEntity(id) && g.type !== 'timeline');
+        const _elsewhere = ids.filter(id => !_here.includes(id) && !_cant.includes(id) && this.store.curvesOf(id).length);
+        const _new = ids.filter(id => !_here.includes(id) && !_cant.includes(id) && !_elsewhere.includes(id));
+        const _said = [];
+        if( _here.length ) { this.flagGraphs([g]); _said.push(i18n('ui.label.already_exists') + ': ' + _here.join('; ')); }
+        if( _cant.length ) _said.push(`timeline ≠ ${g.type}: ` + _cant.join('; '));
+        if( _elsewhere.length ) {
+            this.flagGraphs(this.graphs.filter(x => x.entities.some(e => _elsewhere.includes(e.entity))));
+            if( ids.length > 1 ) _said.push(i18n('ui.label.already_exists') + ': ' + _elsewhere.join('; '));
+        }
+        if( _said.length ) _say(_said.join(' — '));
+        if( _new.length ) return this._graphAddTypes(m, _new);
+        if( ids.length === 1 && _elsewhere.length && _line ) this._openSubmenu(m, ['add', _elsewhere[0]], _line);
+    }
+
+    // The display types of series ids being added to the graph of menu m: the curve menu of
+    // an entity being added, for that graph (addTo — its types those it takes)
+    _graphAddTypes(m, ids)
+    {
+        const { g } = this._menuTargets(m.index);
+        if( !g ) return;
+        const _menu = m.el(), _r = _menu.getBoundingClientRect();
+        this._openCurveMenu(m.index, {
+            entityId: ids.length === 1 ? ids[0] : ids, graphId: null, key: null,
+            forGraph: false, from: 'add', anchor: _menu._menuAnchor ?? null, addTo: g.id,
+        }, { x: _r.left, y: _r.top }, 'left', g.canvas?.parentNode, 'rep');
     }
 
     // The thresholds being chosen for list key on series sid: the curves' own when they read
@@ -1475,8 +1561,10 @@ export class CardMenus
         if( !_menu ) return;
         const { kind, pairs } = this._scopeOf(m);
         if( kind === 'add' ) {
-            const _entity_id = _menu._menuEntityId;
+            const _entity_id = _menu._menuEntityId, _into = _menu._menuAddTo ? this.graphs.find(x => x.id === _menu._menuAddTo) : null;
             m.close();
+            // (a graph's Add ▸: into that graph)
+            if( _into ) return this.showAdded(m.index, this.addCurvesTo(_into, Array.isArray(_entity_id) ? _entity_id : [_entity_id], type, lineMode));
             // Brand-new entities (a wildcard: several), created now as chosen — their names
             // shown a moment in the selector's field
             return this.showAdded(m.index, this.addCurves(Array.isArray(_entity_id) ? _entity_id : [_entity_id], type, lineMode));

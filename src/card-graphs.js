@@ -381,7 +381,7 @@ export class CardGraphs
         this._updateGroupLinkMarkers();
     }
 
-    addGraph(entity_id, { noAutoGroup = false, color = null, fill = null, before = null, hidden = undefined, isStatic = false, interval = null, groupId = null, entry = null } = {})
+    addGraph(entity_id, { noAutoGroup = false, color = null, fill = null, before = null, hidden = undefined, isStatic = false, interval = null, groupId = null, entry = null, into = null } = {})
     {
         // Shows an entity: in a graph of its group it can join (its type, its sub-graph),
         // else — a new entity, without a group — in the last graph if its units are
@@ -394,6 +394,7 @@ export class CardGraphs
         //   interval     the bar interval of the graph
         //   groupId      the group the entity belongs to
         //   entry        its entry of the entity list (pconfig.entities), when it has one
+        //   into         the graph it joins (a graph menu's Add), whatever the rules above
 
         if( this.stateOf(entity_id) == undefined ) return;
 
@@ -428,7 +429,7 @@ export class CardGraphs
         let _combineInsertBefore = null;
         let _graphIndex;
 
-        const _cand = noAutoGroup ? null : this._combineTarget(_pcEntry, type, groupId);
+        const _cand = into && this.graphs.includes(into) ? into : noAutoGroup ? null : this._combineTarget(_pcEntry, type, groupId);
         if( _cand ) {
 
             // If no groupId provided, adopt the target graph's groupId

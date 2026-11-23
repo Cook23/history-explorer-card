@@ -4,16 +4,21 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.91] - 2026-11-20
+## [v1.2.91] - 2026-11-23
+
+### Added
+- A graph's menu: *Add ▸* first — an entity added to that graph: the card's *Add an entity* field (its attributes ▸, a `*` pattern), then the display types the graph can show it as. Taken as a curve dragged onto the graph: one it shows already, or a state that isn't a number on a graph other than a timeline, refused (said, the graph outlined); one shown in another graph, *Cancel* or *Second curve*, as the card's field
 
 ### Fixed
 - An arrowline's extremes past the arrows' band (a sector pointing down or up, a large sector, a whole disc): drawn over the graph above or below. Cut at the band, as asked — not at the graph's area (1.2.90)
 
 ### Docs
 - README_Full.md, `deps/timeline.js.md`: an arrowline's arrows and extremes cut at their band
+- README_Full.md: a graph's menu, *Add ▸*
 
 ### Internal
-- Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band
+- Tests (`arrowline`): the arrows and their extremes drawn within a clip of their band; (`graphmenu`): *Add ▸* — an entity added, refused, a second curve, the types the graph takes
+- `shownIn`: how a series is shown in a graph — the rule of a curve dragged onto it (`typeInto`), for a curve added to it too (`addCurvesTo`); `addGraph`'s `into`
 
 
 ## [v1.2.90] - 2026-11-19
