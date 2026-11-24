@@ -559,10 +559,10 @@
   // The step: stepSize, unless its labels would overlap; else the smallest of 1, 2, 5 × 10ⁿ
   // whose labels don't. Overlapping: two labels nearer than the axis' length over maxTicks - 1
   // (getTickLimit: its height over twice the font size, 11 at most) — a multiple of the step
-  // that near an imposed side left out; o.bareEnds (the Y lock's range: an imposed side off
-  // the step's grid shows no label, see Chart.js's end labels), a multiple a quarter of that
-  // from such a side — half a label: room enough for its own — kept. → the ticks, ascending,
-  // their step (.step); null
+  // that near an imposed side left out — but on o.bareEnds (the Y lock's range: its sides
+  // are edges, their own labels shown only on the step's grid — see Chart.js's end labels):
+  // every multiple of the step between them, as near them as it may be, a label disappearing
+  // only when its value leaves the axis. → the ticks, ascending, their step (.step); null
   // without values (the stock rule)
   var _def = function(v) { return typeof v === 'number' && isFinite(v); };
 
@@ -581,7 +581,7 @@
     if( !r ) return t;
     var v = Object.create(t);
     v.min = r[0]; v.max = r[1]; v.dataMin = undefined; v.dataMax = undefined; v.suggestedMin = undefined; v.suggestedMax = undefined;
-    // (its sides off the grid show no label: see hecAxisTicks's bareEnds)
+    // (its sides edges, labelled only on the grid: see hecAxisTicks's bareEnds)
     v.hecBareEnds = true;
     return v;
   };
@@ -637,10 +637,9 @@
       if( b <= a ) b = fixHi ? b : mk(++kb);
       var gap = ( b - a ) / ( mt - 1 ), eps = Math.max(gap * 1e-9, ( Math.abs(a) + Math.abs(b) ) * 1e-12);
       if( s < gap - eps ) return null;
-      // (how near an imposed side a multiple may be: a label's room from its label; a quarter
-      // of it from a side without one — bareEnds, off the grid)
-      var offGrid = function(v) { var q = v / s; return Math.abs(q - Math.round(q)) > 1e-6; };
-      var nearLo = o.bareEnds && offGrid(a) ? gap / 4 : gap, nearHi = o.bareEnds && offGrid(b) ? gap / 4 : gap;
+      // (how near an imposed side a multiple may be: a label's room — none on bareEnds: its
+      // sides edges, a multiple on them a label of its own, one off the grid none)
+      var nearLo = o.bareEnds ? 0 : gap, nearHi = o.bareEnds ? 0 : gap;
       var ticks = [a || 0];
       for( var k = fixLo ? above(a) : ka + 1, m; ( m = mk(k) ) < b - Math.max(tol(b), eps); k++ ) {
         if( m <= a + Math.max(tol(a), eps) ) continue;

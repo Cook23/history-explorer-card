@@ -4,6 +4,15 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.92] - 2026-11-24
+
+### Fixed
+- A locked Y axis panned: a label near its edge disappeared, came back as the edge's own label when the edge reached its value, then disappeared again — two rules near an edge, a graduation left out within a step of it (a quarter of one off the grid, 1.2.91), the edge labelled only on the step's grid. One rule now: every multiple of the step between the edges, as near them as it may be, each labelled — the edge itself on the grid too, off it none —, a label gone only when its value leaves the axis
+
+### Internal
+- Tests (`yscale`): a locked axis' edges moved a hundredth at a time — a graduation there exactly while it's within them
+
+
 ## [v1.2.91] - 2026-11-23
 
 ### Added
