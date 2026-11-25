@@ -133,7 +133,7 @@ export class HistoryCardState {
 
 
         this.cacheSize = 365 + 1;
-        this.cache = [];
+        this.cache = null;
 
         this._hass = null;
         this._this = null;
@@ -541,6 +541,8 @@ class HistoryExplorerCard extends HTMLElement
         if( this._theme !== undefined && _theme !== this._theme ) requestAnimationFrame(() => this.instance?.contentValid && this.instance.followTheme(this.instance._darkBackground()));
         this._theme = _theme;
         this.instance._hass = hass;
+        // (Home Assistant's clock: see card-history.js noteHaClock)
+        this.instance.noteHaClock(hass);
         // (a card taken back: what came while it was off the page asked, as a refresh does —
         // the same one as for the states changed meanwhile, see scheduleAutoRefresh: one refresh)
         if( this._tookBack ) { this._tookBack = false; this.instance.scheduleAutoRefresh(); }

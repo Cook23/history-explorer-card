@@ -11,20 +11,19 @@ const card = (range) => ({ type: 'custom:history-explorer-card', defaultTimeRang
     graphs: [{ type: 'line', entities: [{ entity: 'sensor.rain', lineMode: 'smart' }] }] });
 const FAIL = ['history/history_during_period', 'recorder/statistics_during_period'];
 
-// In the page: rows (f: a function given the slots' starts — today's last —, now, and the
-// rows' makers: H a value of the history, S five minutes of statistics, each { layer, slot,
-// rows }) put in the cache, the curve drawn again; then what it shows: its points in time
+// In the page: rows (f: a function given the days' starts — today's: day(0) —, now, and the
+// rows' makers: H a value of the history, S five minutes of statistics, each { layer, slot: the
+// day, rows }) put in the cache as Home Assistant's answer for that day (today: until now) —
+// none: nothing asked there —, the curve drawn again; then what it shows: its points in time
 // order or the first one going back (back), the plateaus' ends (plateaus), the plateau ends
 // holding another value than the point before (wrong), the last point a plateau's end (endPlateau)
 const draw = f => `(()=>{
-    const I = el.instance, id = 'sensor.rain', now = Date.now(), last = I.cache.length - 1;
-    for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats'] ) { s[l].delete(id); s.cover[l].delete(id); }
-    const day = i => I.cache[last - i].start_m.valueOf();
+    const I = el.instance, id = 'sensor.rain', now = Date.now(), M = window.HXLocal_moment;
+    for( const l of ['hist', 'fine', 'stats'] ) I.cache.layers[l].delete(id);
+    const day = i => M().subtract(i, 'day').startOf('day').valueOf();
     const H = (t, v) => ({ last_changed: t, state: String(v) });
     const S = (t, v) => ({ last_changed: t, state: v, statistics: { end: t + 300e3, min: v, mean: v, max: v } });
-    // (the history with the time it covers: its day, as an answer of Home Assistant for it — today, until now)
-    for( const { layer, slot, rows } of (${f})(day, now, H, S) ) { const c = I.cache[last - slot]; c[layer].set(id, rows);
-        if( layer === 'hist' && rows.length ) c.cover.hist.set(id, [[c.a, slot === 0 ? now : c.b]]); }
+    for( const { layer, slot, rows } of (${f})(day, now, H, S) ) if( rows.length ) I._mergeLayer(layer, id, rows, day(slot), slot === 0 ? now : day(slot - 1), now);
     I.generateGraphDataFromCache();
     const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && p.y !== undefined);
     const t = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
@@ -55,7 +54,7 @@ module.exports = async function()
                 { layer: 'fine', slot: 1, rows: every(day(1), day(0), 300e3, t => 33, S) },
                 { layer: 'fine', slot: 0, rows: every(day(0), now - 20 * 60e3, 300e3, t => 36, S) },
                 // (the last 15 minutes: the history after the statistics, 43 then 44 — each row in
-                // its day's slot, whatever the hour)
+                // its day's answer, whatever the hour)
                 ...[1, 0].map(slot => ({ layer: 'hist', slot, rows: every(now - 15 * 60e3, now, 300e3, t => t < now - 8 * 60e3 ? 43 : 44, H).filter(r => ( r.last_changed < day(0) ) === ( slot === 1 )) })),
             ]; }`));
         return r.source === 'fine' && r.n > 100 && r.back === -1 && r.wrong.length === 0 && r.plateaus === 0 ? true : JSON.stringify(r);
@@ -90,7 +89,7 @@ module.exports = async function()
     await t.step('the history alone, a source silent three hours: a plateau holding its last value, then the curve again', async () => {
         const r = await t.E(draw(`(day, now, H, S) => { const every = ${every};
             const a = now - 20 * 3600e3, b = now - 8 * 3600e3, c = now - 5 * 3600e3;
-            // (each row in its day's slot — whatever the hour: the silence may be yesterday's)
+            // (each row in its day's answer — whatever the hour: the silence may be yesterday's)
             const rows = [...every(a, b, 60e3, t => 20 + ( t / 60e3 ) % 5, H), ...every(c, now, 60e3, t => 30 + ( t / 60e3 ) % 5, H)];
             return [{ layer: 'hist', slot: 1, rows: rows.filter(r => r.last_changed < day(0)) }, { layer: 'hist', slot: 0, rows: rows.filter(r => r.last_changed >= day(0)) }]; }`));
         return r.source === 'history' && r.back === -1 && r.wrong.length === 0 && r.plateaus >= 1 ? true : JSON.stringify(r);
@@ -159,6 +158,56 @@ module.exports = async function()
         const across = await open('2026-11-14T11:00:00');
         await t.step('the same values, a window of 12 hours from midnight and one across midnight: the same plateaus', async () =>
             fromMidnight.length && JSON.stringify(fromMidnight) === JSON.stringify(across) ? true : JSON.stringify({ fromMidnight, across }));
+        done(await t.close());
+    }
+
+    // ── A page left open past midnight: the states pushed after it in today's slot ──
+    {
+        const at = s => Date.parse(s + '+01:00'), NOW = at('2026-11-23T23:55:00');
+        const rows = [];
+        for( let x = at('2026-11-22T00:05:13'), k = 0; x < NOW; x += 597e3, k++ ) rows.push([( NOW - x ) / 1000, 21 + ( k % 7 ) / 10]);
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1d', graphs: [{ type: 'line', entities: [{ entity: 'sensor.temp', lineMode: 'smart' }] }] },
+            { mock: { states: { 'sensor.temp': { state: 21, unit: '°C', state_class: 'measurement' } }, rows: { 'sensor.temp': rows } },
+              clock: new Date(NOW).toISOString(), timezone: 'Europe/Berlin' });
+        await t.wait(3000);
+        // (a state pushed at about 00:02, 00:04, 00:06 — nothing else asked between them)
+        for( const [m, v] of [[7, 20.5], [2, 20.4], [2, 20.3]] ) { await t.page.clock.fastForward(m * 60e3); await t.E(`setState('sensor.temp', ${v})`); await t.wait(600); }
+        await t.step('states pushed after midnight, the page opened before: in the history in time order, each once', async () => {
+            const r = await t.E(`(()=>{ const rows = el.instance.cache.layers.hist.get('sensor.temp').rows, tt = x => +new Date(x.last_changed);
+                return { sorted: rows.every((x, k) => !k || tt(x) > tt(rows[k - 1])), after: rows.filter(x => tt(x) > ${at('2026-11-24T00:00:00')}).map(x => +x.state) }; })()`);
+            return r.sorted && JSON.stringify(r.after) === '[20.5,20.4,20.3]' ? true : JSON.stringify(r);
+        });
+        await t.step('then a window across midnight, its days loaded: nothing drawn back in time, the values pushed shown', async () => {
+            await t.E(`el.instance.setTimeRangeFromString('1h', true)`); await t.wait(1500);
+            await t.E(`el.instance.moveTimeWindow(${at('2026-11-23T23:35:00')})`); await t.wait(3000);
+            const r = await t.E(`(()=>{ const d = graphAt(0).chart.data.datasets[0].data.filter(p => p.y !== null && p.y !== undefined), tt = p => +new Date(p.x);
+                return { back: d.findIndex((p, i) => i > 0 && tt(p) < tt(d[i - 1])), after: d.filter(p => tt(p) > ${at('2026-11-24T00:00:00')}).map(p => p.y) }; })()`);
+            return r.back === -1 && r.after.includes(20.3) ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── A change of daylight saving time (Europe/Paris): every time UTC — the curve continuous,
+    // a value every 10 minutes, none missing nor twice; the local time a display convention: in
+    // March 1:00 then 3:00 an hour apart (no 2:00), in October 2:00 lasting two hours (a single
+    // 2:00 graduation, the tooltip's 2:30 twice) ──
+    for( const [clock, spring] of [['2026-03-29T06:00:00+02:00', true], ['2026-10-25T06:00:00+01:00', false]] ) {
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '8h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] },
+            { mock: { series: true, historyStep: 600 }, clock, timezone: 'Europe/Paris' });
+        await t.wait(3000);
+        const r = await t.E(`(()=>{ const I = el.instance, c = graphAt(0).chart, s = c.scales['x-axis-0'], a = Date.parse('${clock.slice(0, 10)}T00:00:00Z') - 3600e3, b = a + 4 * 3600e3;
+            // (the history's values over the night — its recorded ones, a request's start aside —, and the curve's points)
+            const rows = I.cache.layers.hist.get('sensor.power').rows.filter(x => !x.b && +x.last_changed >= a && +x.last_changed <= b).map(x => +x.last_changed);
+            const xs = c.data.datasets[0].data.filter(p => p.y != null && !p.hecVirtual).map(p => +new Date(p.x));
+            const tick = l => { const k = s.ticks.indexOf(l); return k < 0 ? null : s._ticks[k].value; };
+            const tip = t => I._tooltipTime({ x: t }, '', false);
+            return { steps: [...new Set(rows.slice(1).map((x, k) => x - rows[k]))], n: rows.length, ordered: xs.every((x, k) => !k || x >= xs[k - 1]),
+                     t1: tick('1:00 am'), t2: tick('2:00 am'), t3: tick('3:00 am'), tip: [tip(a + 5400e3), tip(a + 9000e3)] }; })()`);
+        const H = 3600e3;
+        await t.step(spring ? 'the change to summer time (Paris, March): a value every 10 minutes through the night, none missing; 1:00 then 3:00, an hour apart; the tooltip 1:30 then 3:30'
+                            : 'the change to winter time (Paris, October): a value every 10 minutes through the night, none twice; 2:00 lasting two hours, graduated once; the tooltip 2:30 for both', async () =>
+            JSON.stringify(r.steps) === '[600000]' && r.n === 25 && r.ordered
+            && ( spring ? r.t2 === null && r.t3 - r.t1 === H && r.tip[0] !== r.tip[1] : r.t3 - r.t2 === 2 * H && r.tip[0] === r.tip[1] ) ? true : JSON.stringify(r));
         done(await t.close());
     }
 

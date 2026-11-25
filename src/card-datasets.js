@@ -385,6 +385,24 @@ export class CardDatasets
         }
     }
 
+    // The time entity e's rows are read over for graph g (see card-history.js cachedHistory):
+    // the window widened to the whole groups at its edges, each worked out from all its
+    // values — a column of pixels or an aggregation's group (_groupsOf), a bar's interval, an
+    // arrow's zone —; a timeline's, from a grid of the window's length (its narrow blocks
+    // merged from there: the same while the window moves within it) → [from, to] (ms)
+    rowsSpan(g, e)
+    {
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), r = Math.max(1, t1 - t0), px = Math.max(1, g.chart.hecPlotWidth());
+        const _kind = this.entityKind(g, e);
+        if( _kind === 'line' ) { const G = this._groupsOf(this.resolveAggregation(e), r / px); return [G.start(t0), G.next(G.start(t1))]; }
+        if( _kind === 'bar' ) {
+            const I = barInterval(g.interval)?.length ? barInterval(g.interval) : barInterval(1), td = moment.duration(...I.length);
+            return [moment(t0).startOf(I.start).valueOf(), moment(t1).add(td).add(td).valueOf()];
+        }
+        if( _kind === 'arrowline' ) { const Z = ARROW_SPACING_PX * r / px; return [Math.floor(t0 / Z) * Z, ( Math.floor(t1 / Z) + 1 ) * Z]; }
+        return [Math.floor(t0 / r) * r, t1];
+    }
+
     // Is series id drawn from all the cache knows of it (knownHistory) — a curve in smart mode,
     // its silences worked out there: drawn again when its history outside the window comes
     drawnFromKnownHistory(id)
@@ -767,8 +785,8 @@ export class CardDatasets
             if( !merged ) state = this.processRaw(data[i].state, process);
             const i0 = i;
 
-            // Skip noop state changes (the state in force repeated at a cache slot's start,
-            // local midnight): a block judged by its whole length, merging or not
+            // Skip noop state changes (the state in force repeated: a block judged by its whole
+            // length, merging or not)
             while( i < n-1 && this.processRaw(data[i].state, process) == this.processRaw(data[i+1].state, process) ) {
                 ++i;
                 t1 = ( i < n-1 ) ? data[i+1].last_changed : m_max;

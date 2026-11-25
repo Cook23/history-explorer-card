@@ -12,18 +12,15 @@ const FAIL = ['history/history_during_period', 'recorder/statistics_during_perio
 const card = (range, more = {}, graph = {}) => ({ type: 'custom:history-explorer-card', defaultTimeRange: range, statistics: { enabled: false }, ...more,
     graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }], ...graph }] });
 
-// In the page: rows (f: a function given now and the rows' maker H) put in today's and
-// yesterday's slots, the curve drawn again; then the left axis' bounds and what is shown
-// in the window
+// In the page: rows (f: a function given now and the rows' maker H) put in the cache as Home
+// Assistant's answer for yesterday and today, the curve drawn again; then the left axis'
+// bounds and what is shown in the window
 const draw = f => `(()=>{
-    const I = el.instance, id = 'sensor.power', now = Date.now(), last = I.cache.length - 1;
-    for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day'] ) s[l].delete(id);
+    const I = el.instance, id = 'sensor.power', now = Date.now(), M = window.HXLocal_moment;
+    for( const l of ['hist', 'fine', 'stats', 'day'] ) I.cache.layers[l].delete(id);
     const H = (t, v) => ({ last_changed: t, state: String(v) });
-    const rows = (${f})(now, H);
-    for( const k of [0, 1] ) {
-        const s = I.cache[last - k], a = s.start_m.valueOf(), b = s.end_m.valueOf();
-        s.hist.set(id, rows.filter(r => r.last_changed >= a && r.last_changed < b)); s.cover.hist.set(id, [[a, b]]);
-    }
+    const rows = (${f})(now, H), a = M().subtract(1, 'day').startOf('day').valueOf(), b = M().add(1, 'day').startOf('day').valueOf();
+    I._mergeLayer('hist', id, rows.filter(r => r.last_changed >= a && r.last_changed < b), a, b, now);
     I.generateGraphDataFromCache();
     return axis();
 })()`;
@@ -227,11 +224,11 @@ module.exports = async function()
         await t.wait(1500);
         await t.step('graphs 60 to 600 px high, values from -3 to 42.4, 0 to 2900, 1e6 to 1e6 + 3, a single one…: each axis drawn with the ticks of the values given for its final height — never those of the half height Chart.js lays it out at first —, holding them, within the ticks it allows', async () => {
             const r = await t.E(`(()=>{
-                const I = el.instance, id = 'sensor.power', now = Date.now(), last = I.cache.length - 1, bad = [];
+                const I = el.instance, id = 'sensor.power', now = Date.now(), M = window.HXLocal_moment, a = M().subtract(1, 'day').startOf('day').valueOf(), b = M().add(1, 'day').startOf('day').valueOf(), bad = [];
                 for( const [lo, hi] of [[-3, 42.4], [0, 2900], [0.02, 0.031], [-1500, -1450], [1e6, 1e6 + 3], [-0.004, 0.0021], [17, 17], [-7e9, 3e10]] ) {
-                    for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day'] ) s[l].delete(id);
+                    for( const l of ['hist', 'fine', 'stats', 'day'] ) I.cache.layers[l].delete(id);
                     const rows = []; for( let t = now - 47 * 3600e3, k = 0; t < now; t += 300e3, k++ ) rows.push({ last_changed: t, state: String([lo, hi, ( lo + hi ) / 2][k % 3]) });
-                    for( const k of [0, 1] ) { const s = I.cache[last - k], a = s.start_m.valueOf(), b = s.end_m.valueOf(); s.hist.set(id, rows.filter(r => r.last_changed >= a && r.last_changed < b)); s.cover.hist.set(id, [[a, b]]); }
+                    I._mergeLayer('hist', id, rows.filter(r => r.last_changed >= a && r.last_changed < b), a, b, now);
                     I.generateGraphDataFromCache('the test', null, true);
                     for( const g of I.graphs ) {
                         const sc = g.chart.scales['y-axis-0'], tk = sc.ticksAsNumbers.slice().sort((x, y) => x - y), lim = Math.max(2, Math.min(11, Math.ceil(sc.height / 24)));
@@ -250,11 +247,11 @@ module.exports = async function()
         await t.wait(1500);
         await t.step('ystepSize 5: obeyed where its labels have room at the graph\'s height; where they would overlap, the axis\' automatic ticks — and the card warns once for that graph, never again at the next drawings', async () => {
             const r = await t.E(`(()=>{
-                const I = el.instance, id = 'sensor.power', now = Date.now(), last = I.cache.length - 1, bad = [], ignored = new Set();
+                const I = el.instance, id = 'sensor.power', now = Date.now(), M = window.HXLocal_moment, a = M().subtract(1, 'day').startOf('day').valueOf(), b = M().add(1, 'day').startOf('day').valueOf(), bad = [], ignored = new Set();
                 for( const [lo, hi] of [[-3, 42.4], [0, 12], [0, 2900], [-3, 42.4]] ) {
-                    for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day'] ) s[l].delete(id);
+                    for( const l of ['hist', 'fine', 'stats', 'day'] ) I.cache.layers[l].delete(id);
                     const rows = []; for( let t = now - 47 * 3600e3, k = 0; t < now; t += 300e3, k++ ) rows.push({ last_changed: t, state: String([lo, hi][k % 2]) });
-                    for( const k of [0, 1] ) { const s = I.cache[last - k], a = s.start_m.valueOf(), b = s.end_m.valueOf(); s.hist.set(id, rows.filter(r => r.last_changed >= a && r.last_changed < b)); s.cover.hist.set(id, [[a, b]]); }
+                    I._mergeLayer('hist', id, rows.filter(r => r.last_changed >= a && r.last_changed < b), a, b, now);
                     I.generateGraphDataFromCache('the test', null, true);
                     for( const g of I.graphs ) {
                         const sc = g.chart.scales['y-axis-0'], tk = sc.ticksAsNumbers.slice().sort((x, y) => x - y), lim = Math.max(2, Math.min(11, Math.ceil(sc.height / 24)));
@@ -420,9 +417,9 @@ module.exports = async function()
             return r.probeFirst && r.hour >= 1 && r.hour <= 2.05 && r.fine === fine && r.coarse === 'hour' ? true : JSON.stringify(r);
         });
         if( !fine ) await t.step('a value every 10 min: its 5-minute statistics in the cache never drawn — a zoom out and back, the probe not asked again', async () => {
-            const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', c1 = I.mapEndTimeToCacheSlot(I.endTime), s = I.cache[c1], a = s.start_m.valueOf();
-                s.fine.set(id, Array.from({ length: 12 }, (_, k) => ({ last_changed: a + k * 300e3, state: 999, statistics: { end: a + ( k + 1 ) * 300e3, min: 999, mean: 999, max: 999 } })));
-                s.hist.delete(id); s.cover.hist.delete(id);
+            const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', a = window.HXLocal_moment(Math.min(Date.parse(I.endTime), Date.now()) - 1).startOf('day').valueOf();
+                I._mergeLayer('fine', id, Array.from({ length: 12 }, (_, k) => ({ last_changed: a + k * 300e3, state: 999, statistics: { end: a + ( k + 1 ) * 300e3, min: 999, mean: 999, max: 999 } })), a, a + 3600e3, Date.now());
+                I.cache.layers.hist.delete(id);
                 I.generateGraphDataFromCache();
                 return { drawn999: I.graphs[0].chart.data.datasets[0].data.some(p => p.y === 999), probes: __ws.filter(w => w.type === 'history/history_during_period' && ( Date.parse(w.end ?? 0) - Date.parse(w.start) ) < 3 * 3600e3 && w.start === __ws.find(x => x.type === 'history/history_during_period').start).length }; })()`);
             return !r.drawn999 ? true : JSON.stringify(r);
@@ -515,13 +512,13 @@ module.exports = async function()
     await t.wait(1500);
     await t.step('six hours of hourly statistics all at the same value, min = mean = max (the sensor silent): one value held over them — a plateau to their end in smart mode, no point in it', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', a = Math.floor(( Date.now() - 20 * 3600e3 ) / 3600e3) * 3600e3;
-            for( const x of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) { x[l].delete(id); x.cover[l].delete(id); }
+            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) I.cache.layers[l].delete(id);
             const st = (k, v, lo = v, hi = v) => ({ last_changed: a + k * 3600e3, state: v, statistics: { end: a + ( k + 1 ) * 3600e3, min: lo, mean: v, max: hi, raw: { mean: v, min: lo, max: hi } } });
             const rows = [st(0, 300, 200, 400), st(1, 350, 300, 420)];
             for( let k = 2; k < 8; k++ ) rows.push(st(k, 380));
             for( let k = 8; k < 19; k++ ) rows.push(st(k, 300 + k, 250, 450));
-            for( const x of rows ) { const s = I.cache[I._slotAt(x.last_changed)]; if( !s.stats.has(id) ) { s.stats.set(id, []); s.cover.stats.set(id, [[s.start_m.valueOf(), s.end_m.valueOf()]]); } s.stats.get(id).push(x); }
-            const c = I.cachedHistory(id, I._slotAt(a), I.cache.length - 1), held = c.find(x => x.statistics?.held);
+            I._mergeLayer('stats', id, rows, window.HXLocal_moment(a).startOf('day').valueOf(), window.HXLocal_moment().add(1, 'day').startOf('day').valueOf(), Date.now());
+            const c = I.cachedHistory(id, a, Date.now()), held = c.find(x => x.statistics?.held);
             I.generateGraphDataFromCache();
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), d = I.graphs[0].chart.data.datasets[0].data;
             const inRun = d.filter(p => !p.hecVirtual && x(p) > a + 3 * 3600e3 && x(p) < a + 8 * 3600e3).length;
@@ -562,8 +559,9 @@ module.exports = async function()
             return { last5: d.filter(p => p.y !== null && x(p) > now - 150 * 864e5).length, before: d.filter(p => p.y !== null && x(p) < now - 190 * 864e5).length, gaps: d.filter(p => p.y === null).length }; })()`;
         // (the last 5 months emptied from the cache — as a purge leaves them —, the year before
         // them loaded; then the window shown again, Home Assistant slow to answer)
-        await t.E(`(async()=>{ const I = el.instance, from = Date.now() - 150 * 864e5;
-            for( const s of I.cache ) if( s.b > from ) for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) { s[l].clear(); s.cover[l].clear(); s.askedAt[l].clear(); }
+        await t.E(`(async()=>{ const I = el.instance, from = window.HXLocal_moment(Date.now() - 150 * 864e5).startOf('day').valueOf();
+            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) for( const tr of I.cache.layers[l].values() ) {
+                tr.rows = tr.rows.filter(x => +new Date(x.last_changed) < from); tr.spans = tr.spans.map(s => ({ ...s, b: Math.min(s.b, from) })).filter(s => s.b > s.a); }
             I._cacheVersion = I.cacheVersion() + 1; window.MOCK.historyDelay = 4000; I.updateHistory(); })()`);
         await t.wait(800);
         const a = await t.E(look);
@@ -610,8 +608,8 @@ module.exports = async function()
     t = await openCard(card('6o', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 60 } });
     await t.wait(5000);
     await t.step('6 months (a column of some 5 hours), the history of a week ago in the cache too: the hourly statistics drawn there — not the history, worked out again for nothing —; the last minutes, not compiled yet, from the history', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', k = I.cache.length - 8, s = I.cache[k], a = s.start_m.valueOf(), b = s.end_m.valueOf();
-            s.hist.set(id, Array.from({ length: 1440 }, (_, m) => ({ last_changed: a + m * 60e3, state: '999' }))); s.cover.hist.set(id, [[a, b]]);
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', M = window.HXLocal_moment, a = M().subtract(7, 'day').startOf('day').valueOf(), b = M().subtract(6, 'day').startOf('day').valueOf();
+            I._mergeLayer('hist', id, Array.from({ length: 1440 }, (_, m) => ({ last_changed: a + m * 60e3, state: '999' })), a, b, Date.now());
             I.generateGraphDataFromCache();
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null);
             const day = d.filter(p => x(p) >= a && x(p) < b), last = d.filter(p => x(p) > Date.now() - 20 * 60e3 && !p.hecVirtual);
@@ -624,10 +622,9 @@ module.exports = async function()
     t = await openCard(card('24h', { statistics: { enabled: true } }), { height: 900, mock: { series: true, fail: FAIL }, init: AXIS });
     await t.wait(1500);
     await t.step('statistics coarser than the window\'s own sources (a month\'s, loaded for another window): never drawn — no curve over the window from them, the window\'s own not there yet', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', c0 = I.mapStartTimeToCacheSlot(I.startTime);
-            for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) s[l].delete(id);
-            const s = I.cache[c0 - 1], a = s.start_m.valueOf();
-            s.month.set(id, [{ last_changed: a, state: 555, statistics: { end: a + 86400e3, min: 555, mean: 555, max: 555 } }]);
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', a = window.HXLocal_moment(I.startTime).startOf('day').subtract(1, 'day').valueOf();
+            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) I.cache.layers[l].delete(id);
+            I._mergeLayer('month', id, [{ last_changed: a, state: 555, statistics: { end: a + 86400e3, min: 555, mean: 555, max: 555 } }], a, a + 86400e3, Date.now());
             I.generateGraphDataFromCache();
             return { drawn: I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null).map(p => p.y) }; })()`);
         return !r.drawn.includes(555) ? true : JSON.stringify(r);
@@ -738,11 +735,11 @@ module.exports = async function()
     t = await openCard(card('24h', {}, { entities: [{ entity: 'sensor.wind', lineMode: 'lines' }] }), { height: 900, mock: { series: true, fail: FAIL } });
     await t.wait(1500);
     await t.step('an angle, a column of pixels holding 0°, 170°, 340° and 350° a quarter of it each: its point Home Assistant\'s circular mean — the direction of the sum of the unit vectors, 350° (lowpass_dt\'s former rule, by the shortest-way differences: 305°)', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.wind', now = Date.now(), last = I.cache.length - 1;
-            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) for( const x of I.cache ) x[l].delete(id);
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.wind', now = Date.now(), M = window.HXLocal_moment;
+            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) I.cache.layers[l].delete(id);
             const w = ( Date.parse(I.endTime) - Date.parse(I.startTime) ) / I.graphs[0].chart.hecPlotWidth(), g = Math.floor(( now - 6 * 3600e3 ) / w) * w;
             const rows = [[g - 2 * 3600e3, 0], [g, 0], [g + w / 4, 170], [g + w / 2, 340], [g + 3 * w / 4, 350], [g + w, 350]].map(([t, v]) => ({ last_changed: t, state: String(v) }));
-            for( const k of [0, 1] ) { const s = I.cache[last - k]; s.hist.set(id, rows.filter(r => r.last_changed >= s.start_m.valueOf() && r.last_changed < s.end_m.valueOf())); s.cover.hist.set(id, [[s.start_m.valueOf(), s.end_m.valueOf()]]); }
+            { const a = M().subtract(1, 'day').startOf('day').valueOf(), b = M().add(1, 'day').startOf('day').valueOf(); I._mergeLayer('hist', id, rows.filter(r => r.last_changed >= a && r.last_changed < b), a, b, now); }
             I.generateGraphDataFromCache();
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), p = I.graphs[0].chart.data.datasets[0].data.find(q => q.y !== null && x(q) > g && x(q) < g + w);
             return p ? { y: ( ( p.y % 360 ) + 360 ) % 360, lo: p.yMin ?? null } : null; })()`);
@@ -754,12 +751,12 @@ module.exports = async function()
     t = await openCard(card('24h', { statistics: { enabled: true } }), { height: 900, mock: { series: true, fail: FAIL } });
     await t.wait(1500);
     await t.step('a day with its history (6 values) and its 5-minute statistics (288): the history drawn — the reality, however sparse', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', last = I.cache.length - 1, s = I.cache[last - 1], a = s.start_m.valueOf();
-            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) for( const x of I.cache ) x[l].delete(id);
-            s.hist.set(id, Array.from({ length: 6 }, (_, k) => ({ last_changed: a + k * 4 * 3600e3, state: String(100 + k) }))); s.cover.hist.set(id, [[a, s.end_m.valueOf()]]);
-            s.fine.set(id, Array.from({ length: 288 }, (_, k) => ({ last_changed: a + k * 300e3, state: 999, statistics: { end: a + ( k + 1 ) * 300e3, min: 999, mean: 999, max: 999 } })));
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', M = window.HXLocal_moment, a = M().subtract(1, 'day').startOf('day').valueOf(), b = M().startOf('day').valueOf();
+            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) I.cache.layers[l].delete(id);
+            I._mergeLayer('hist', id, Array.from({ length: 6 }, (_, k) => ({ last_changed: a + k * 4 * 3600e3, state: String(100 + k) })), a, b, Date.now());
+            I._mergeLayer('fine', id, Array.from({ length: 288 }, (_, k) => ({ last_changed: a + k * 300e3, state: 999, statistics: { end: a + ( k + 1 ) * 300e3, min: 999, mean: 999, max: 999 } })), a, b, Date.now());
             I.generateGraphDataFromCache();
-            const b = s.end_m.valueOf(), d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && p.x >= a && p.x < b);
+            const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && p.x >= a && p.x < b);
             return { n: d.length, stats: d.filter(p => p.statistics || p.y === 999).length }; })()`);
         return r.n >= 1 && r.stats === 0 ? true : JSON.stringify(r);
     });
@@ -925,25 +922,28 @@ module.exports = async function()
     t = await openCard(card('24h', { statistics: { enabled: true } }), { height: 900, mock: { series: true } });
     await t.wait(3000);
     await t.step('past 500 000 rows: purged back under 300 000 — the farthest days\' history first, then their 5-minute statistics; the hourly ones kept; the window and a day on each side untouched', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', c0 = I.mapStartTimeToCacheSlot(I.startTime);
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', M = window.HXLocal_moment, day = d => M(I.startTime).startOf('day').subtract(d, 'day').valueOf();
             const rows = (n, t) => Array.from({ length: n }, (_, k) => ({ last_changed: t + k, state: '1' }));
-            // (the rows of the window's slots, in those layers)
-            const _win = layers => { const c1 = I.mapEndTimeToCacheSlot(I.endTime); let n = 0;
-                for( let i = Math.max(0, c0); i <= c1; i++ ) for( const l of layers ) for( const a of I.cache[i][l].values() ) n += a.length; return n; };
+            // (the rows within the window, in those layers)
+            const t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime), _win = layers => { let n = 0;
+                for( const l of layers ) for( const tr of I.cache.layers[l].values() ) n += tr.rows.filter(x => +new Date(x.last_changed) >= t0 && +new Date(x.last_changed) <= t1).length; return n; };
             const win = _win(['hist', 'fine', 'stats', 'day']);
-            // (40 days before the window: 13 000 rows of history each, 288 of 5-minute statistics, 24 hourly)
-            for( let d = 3; d < 43; d++ ) { const s = I.cache[c0 - d], t = s.start_m.valueOf();
-                s.hist.set(id, rows(13000, t)); s.fine.set(id, rows(288, t)); s.stats.set(id, rows(24, t)); }
+            // (40 days before the window's: 13 000 rows of history each, 288 of 5-minute statistics, 24 hourly)
+            for( let d = 3; d < 43; d++ ) { const a = day(d), b = day(d - 1);
+                I._mergeLayer('hist', id, rows(13000, a), a, b, Date.now()); I._mergeLayer('fine', id, rows(288, a), a, b, Date.now()); I._mergeLayer('stats', id, rows(24, a), a, b, Date.now()); }
             const before = I.cacheRows(); I._purge(); const after = I.cacheRows();
-            const kept = d => ['hist', 'fine', 'stats'].map(l => I.cache[c0 - d][l].has(id) ? 1 : 0).join('');
-            return { before, after, win: _win(['hist', 'fine', 'stats', 'day']) === win, near: kept(3), far: kept(42), hourlyFar: I.cache[c0 - 42].stats.has(id) }; })()`);
+            const _has = (l, d) => ( I.cache.layers[l].get(id)?.rows ?? [] ).some(x => +new Date(x.last_changed) >= day(d) && +new Date(x.last_changed) < day(d - 1));
+            const kept = d => ['hist', 'fine', 'stats'].map(l => _has(l, d) ? 1 : 0).join('');
+            return { before, after, win: _win(['hist', 'fine', 'stats', 'day']) === win, near: kept(3), far: kept(42), hourlyFar: _has('stats', 42) }; })()`);
         return r.before > 500000 && r.after <= 300000 && r.win && r.near === '111' && r.far[0] === '0' && r.hourlyFar ? true : JSON.stringify(r);
     });
     await t.step('a window of 60 days: its sides kept a month each — the zone phase 1 asks —, never a width each: past 500 000 rows, history 45 days before the window purged, 20 days before it kept', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power'; I.applyTimeRange(1440, true); const c0 = I.mapStartTimeToCacheSlot(I.startTime);
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power'; I.applyTimeRange(1440, true); const M = window.HXLocal_moment, day = d => M(I.startTime).startOf('day').subtract(d, 'day').valueOf();
             const rows = (n, t) => Array.from({ length: n }, (_, k) => ({ last_changed: t + k, state: '1' }));
-            for( const d of [20, 45] ) { const s = I.cache[c0 - d]; s.hist.set(id, rows(300000, s.start_m.valueOf())); }
-            I._purge(); return { d20: I.cache[c0 - 20].hist.has(id), d45: I.cache[c0 - 45].hist.has(id) }; })()`);
+            for( const d of [20, 45] ) I._mergeLayer('hist', id, rows(300000, day(d)), day(d), day(d - 1), Date.now());
+            // (a day's rows — the state in force where the purge stops, kept: see _purge — not counted)
+            const _has = d => ( I.cache.layers.hist.get(id)?.rows ?? [] ).some(x => !x.b && +new Date(x.last_changed) >= day(d) && +new Date(x.last_changed) < day(d - 1));
+            I._purge(); return { d20: _has(20), d45: _has(45) }; })()`);
         return r.d20 && !r.d45 ? true : JSON.stringify(r);
     });
     done(await t.close());

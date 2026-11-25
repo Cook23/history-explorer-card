@@ -527,15 +527,15 @@ export class CardCharts
 
     // The values around the time window the automatic Y axis id of a chart looks at (see
     // _autoYAxis), by curve (its index): entries { x, lo, hi } — v: a value as the axis counts it: from the cache
-    // over the slots around the window (yScaleSlots: the statistics asked for it, or anything
+    // over the time around the window (yScaleRange: the statistics asked for it, or anything
     // loaded there), of each of its curves shown — not an angle (unwrapped around the window),
     // not a fixed value —, outside the points drawn: its values as drawn (process, scale),
     // its statistics' min and max with its band (showMinMax). Read again only when the slots
     // or the cache change (cacheVersion)
     _yScaleNeighbours(chart, id, v)
     {
-        const g = this.graphs.find(g => g.chart === chart), [n0, n1] = this.yScaleSlots();
-        if( !g || n0 < 0 || n1 < 0 ) return new Map();
+        const g = this.graphs.find(g => g.chart === chart), R = this.yScaleRange();
+        if( !g || !R ) return new Map();
         // (each curve of the axis, and the time its points drawn cover)
         const _curves = [];
         g.entities.forEach((e, j) => {
@@ -546,7 +546,7 @@ export class CardCharts
             const _first = ds.data.find(p => !isNaN(_x(p))), _last = ds.data.findLast(p => !isNaN(_x(p)));
             _curves.push({ e, j, x0: _first ? _x(_first) : Infinity, x1: _last ? _x(_last) : -Infinity });
         });
-        const key = [n0, n1, this.cacheVersion(), id, ..._curves.flatMap(c => [c.e.entity, c.x0, c.x1])].join();
+        const key = [...R, this.cacheVersion(), id, ..._curves.flatMap(c => [c.e.entity, c.x0, c.x1])].join();
         this._yNeighbours ??= new WeakMap();
         const _k = this._yNeighbours.get(chart)?.[id];
         if( _k?.key === key ) return _k.entries;
@@ -556,7 +556,7 @@ export class CardCharts
             entries.set(j, a);
             const proc = this.processOf(e), scale = this.drawScaleOf(e) * ( e.siConversionFactor ?? 1 );
             const _num = s => { const x = Number(this.process(s, proc)); return Number.isFinite(x) ? v(x * scale) : NaN; };
-            for( const row of this.cachedHistory(e.entity, n0, n1) ) {
+            for( const row of this.cachedHistory(e.entity, ...R) ) {
                 const t = msOf(row.last_changed);
                 if( t >= x0 && t <= x1 ) continue;
                 let lo = _num(row.state), hi = lo;

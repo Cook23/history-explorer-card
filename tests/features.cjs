@@ -121,10 +121,10 @@ module.exports = async function()
             const p = d.find(p => p.statisticsPeriod >= 86400e3);
             // (the first point in the window: drawn from its start — the points before it, the values around it)
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), w = d.filter(p => x(p) >= Date.parse(I.startTime));
-            return { source: I._sourceNeeded(), c0: I.mapStartTimeToCacheSlot(I.startTime), n: d.length, first: w.length ? Math.round(( x(w[0]) - Date.parse(I.startTime) ) / 86400e3) : null,
+            return { source: I._sourceNeeded(), reaches: I.cache.from <= Date.parse(I.startTime), n: d.length, first: w.length ? Math.round(( x(w[0]) - Date.parse(I.startTime) ) / 86400e3) : null,
                      title: p ? I._tooltipTitle(p, '') : null }; })()`);
         r.day = await dayAsked();
-        return r.source === 'day' && r.c0 >= 0 && r.n > 300 && Math.abs(r.first) <= 2 && r.day && /^Statistics 1 d: /.test(r.title ?? '') ? true : JSON.stringify(r);
+        return r.source === 'day' && r.reaches && r.n > 300 && Math.abs(r.first) <= 2 && r.day && /^Statistics 1 d: /.test(r.title ?? '') ? true : JSON.stringify(r);
     });
     done(await t.close());
     // (the shortest range at least that long: 36 hours, 2 days; 13 hours, a day)
@@ -561,7 +561,7 @@ module.exports = async function()
     });
     await t.step('Export ▸ Statistics ▸ Hour, the cache emptied of them: the days asked, the file saved — named "Statistics 1 h - …"', async () => {
         const n0 = await t.E(`__ws.filter(w => w.period === 'hour').length`);
-        await t.E(`(()=>{ for( const s of el.instance.cache ) { s.stats.delete('sensor.power'); s.cover.stats.delete('sensor.power'); } })()`);
+        await t.E(`el.instance.cache.layers.stats.delete('sensor.power')`);
         await t.E('captureSave()'); await t.E(`el.instance.exportStatistics('hour')`);
         for( let i = 0; i < 30 && !(await t.E('__saved')); i++ ) await t.wait(100);
         const r = await t.E(`({ asked: __ws.filter(w => w.period === 'hour').length - ${n0}, name: __saved?.name, rows: __saved?.text.split('\\n').filter(l => /^\\d{4}-/.test(l)).length })`);
@@ -1308,14 +1308,6 @@ module.exports = async function()
         const r = await firstShown(t);
         return !failed.loading && failed.requests === 0 && r.first !== null && !r.loading ? true : JSON.stringify({ failed, r });
     });
-    await t.step('a page left open past midnight: a day added to the cache, the new day\'s history asked at the refresh', async () => {
-        // (the cache as made yesterday: its last day ending today at 0:00)
-        await t.E('el.instance.today()'); await t.wait(4000);
-        await t.E(`(()=>{ const I=el.instance; I.cache.pop(); I.cacheSize--; __ws.length=0; I.refresh(); })()`); await t.wait(3000);
-        const r = await t.E(`(()=>{ const I=el.instance, last=I.cache[I.cache.length-1]; return { size: I.cacheSize === I.cache.length - 1, lastEnd: +new Date(last.end) > Date.now(),
-            today: __ws.some(w=>w.type==='history/history_during_period' && Date.parse(w.end) > Date.now()) }; })()`);
-        return r.size && r.lastEnd && r.today ? true : JSON.stringify(r);
-    });
     done(await t.close());
 
     // ── The history after the statistics: the last minutes only, asked again at each
@@ -1327,7 +1319,7 @@ module.exports = async function()
         await t.E('(()=>{ __ws.length=0; el.instance.refresh(); })()'); await t.wait(2500);
         const ws = await t.E(`__ws.filter(${OWN})`), d1 = (await t.E('datasets(0)'))[0];
         const h = ws.filter(w => w.type === 'history/history_during_period'), st = ws.filter(w => w.type === 'recorder/statistics_during_period');
-        const today = Date.parse(await t.E('el.instance.cache[el.instance.cache.length-1].start'));
+        const today = await t.E('window.HXLocal_moment().startOf("day").valueOf()');
         const ok = d0.x1 >= Date.now() - 5 * 60e3 && d1.x1 >= Date.now() - 5 * 60e3 && h.length >= 1 && h.every(w => Date.parse(w.start) >= Date.now() - 25 * 60e3)
             && st.every(w => Date.parse(w.start) >= today);
         return ok ? true : JSON.stringify({ d0, d1, ws });
@@ -1492,9 +1484,9 @@ module.exports = async function()
         const r = await t.E(`(()=>{ const I=el.instance, d=I.graphs[0].chart.data.datasets[0].data, x=d.map(p=>+new Date(p.x));
             const h=__ws.filter(w=>w.type==='history/history_during_period').map(w=>[w.start, w.end]);
             const evening=x.filter(v=>v>Date.parse('2026-10-18T23:41:00+02:00') && v<Date.parse('2026-10-19T00:00:00+02:00')).length;
-            return { h, evening, live: I.state.autoScroll, slots: I.cache.length - 1 === I.cacheSize }; })()`);
+            return { h, evening, live: I.state.autoScroll }; })()`);
         // (the evening's end from when it was asked — not the whole day again —, and the new day: in one request)
-        const ok = r.h.some(([a, b]) => a >= '2026-10-18T23:00' && a < '2026-10-19T00:00' && Date.parse(b) > Date.parse('2026-10-19T00:00:00+02:00')) && r.evening >= 3 && r.live && r.slots;
+        const ok = r.h.some(([a, b]) => Date.parse(a) >= Date.parse('2026-10-18T23:00:00+02:00') && Date.parse(a) < Date.parse('2026-10-19T00:00:00+02:00') && Date.parse(b) > Date.parse('2026-10-19T00:00:00+02:00')) && r.evening >= 3 && r.live;
         return ok ? true : JSON.stringify(r);
     });
     done(await t.close());
@@ -1804,7 +1796,7 @@ module.exports = async function()
             await new Promise(r => setTimeout(r, 800));
             const n = el2.instance.graphs[0]?.chart.data.datasets[0]?.data.length ?? 0;
             await new Promise(r => setTimeout(r, 2500));
-            const day = el2.instance.cache[el2.instance.cache.length - 1].start_m.valueOf();
+            const day = window.HXLocal_moment().startOf('day').valueOf();
             // (the window's — the background widening its sides aside)
             const t0 = Date.parse(el2.instance.startTime), w = __ws.slice(n0).filter(w => /during_period/.test(w.type) && ( w.end ? Date.parse(w.end) : Date.now() ) > t0);
             return { n, asked: w.map(x => [x.type[0], x.period, x.start]), old: w.filter(x => Date.parse(x.start) < day).length }; })()`);
@@ -1850,7 +1842,7 @@ module.exports = async function()
     await t.step('another card of the same name, other curves (its YAML): a cache of its own — never the first one\'s', async () => {
         const r = await t.E(`(async()=>{ const e = ${another(`{ ...window.CFG, graphs: [{ type: 'line', entities: [{ entity: 'sensor.rain' }] }] }`)};
             await new Promise(r => setTimeout(r, 1500));
-            const shared = e.instance.cache.some(s => s.hist.has('sensor.power')); e.remove(); return { shared }; })()`);
+            const shared = e.instance.cache.layers.hist.has('sensor.power'); e.remove(); return { shared }; })()`);
         return !r.shared ? true : JSON.stringify(r);
     });
     await t.step('the card off the page more than 10 minutes: its cache let go — the card made again asks its window again', async () => {
@@ -2051,7 +2043,7 @@ module.exports = async function()
         await t.wait(4000);
         await t.step('the day before held (its last row 0 at 23:56), the day asked apart (Home Assistant: 0 in force at 00:00): no row at 00:00 in the cache', async () => {
             const r = await t.E(`(()=>{ const I = el.instance, m = ${at('2026-11-14T00:00:00')};
-                const all = I.cache.flatMap(s => s.hist.get('sensor.pulse') ?? []).map(x => +new Date(x.last_changed));
+                const all = ( I.cache.layers.hist.get('sensor.pulse')?.rows ?? [] ).map(x => +new Date(x.last_changed));
                 return { midnight: all.filter(x => x === m).length, before: all.filter(x => x < m).length }; })()`);
             return r.midnight === 0 && r.before > 0 ? true : JSON.stringify(r);
         });
@@ -2121,7 +2113,7 @@ module.exports = async function()
             const r = { ...await t.E(_lastOf(id)), asked: await t.E(`__ws.some(x => x.type === 'history/history_during_period' && x.at > ${_t} && x.at < ${_t} + 6000)`) };
             return r.asked && String(r.v) === String(last) && Math.abs(r.at - _t) < 1000 ? true : JSON.stringify({ ...r, set: _t });
         });
-        const _at = () => t.E(`(()=>{ const I = el.instance; return ( I.cache[I.cache.length - 1].hist.get('${id}') ?? [] ).filter(x => Math.abs(+new Date(x.last_changed) - ${_t}) < 1000).map(x => ({ v: x.state, live: !!x.live })); })()`);
+        const _at = () => t.E(`(()=>{ const I = el.instance; return ( I.cache.layers.hist.get('${id}')?.rows ?? [] ).filter(x => Math.abs(+new Date(x.last_changed) - ${_t}) < 1000).map(x => ({ v: x.state, live: !!x.live })); })()`);
         await t.wait(4000);
         await t.E(`setState('sensor.power2', '302')`); await t.wait(3500);   // (written since; another curve shown changing: a refresh, asked from after it)
         await t.step(`${what}: written since, the next refresh — asked from after it — keeps it: one row at its time`, async () => {
@@ -2154,7 +2146,7 @@ module.exports = async function()
         const _t = await t.E(`(()=>{ const t = Date.now(); setState('sensor.late', '250'); return t; })()`);
         await t.wait(1000); await t.E(`setState('sensor.late', '100')`); await t.wait(3000);
         await t.step('100, 250, then 100 again, written 6 s late: the 250 between them in the history at once, at its time (shorter than a column: in the cache)', async () => {
-            const r = await t.E(`(()=>{ const I = el.instance; return ( I.cache[I.cache.length - 1].hist.get('sensor.late') ?? [] ).filter(x => +x.state === 250).map(x => +new Date(x.last_changed) - ${_t}); })()`);
+            const r = await t.E(`(()=>{ const I = el.instance; return ( I.cache.layers.hist.get('sensor.late')?.rows ?? [] ).filter(x => +x.state === 250).map(x => +new Date(x.last_changed) - ${_t}); })()`);
             return r.length === 1 && Math.abs(r[0]) < 1000 ? true : JSON.stringify(r);
         });
     }
@@ -2230,9 +2222,11 @@ module.exports = async function()
         for( const v of ['1', '2', '3'] ) { await t.E(`setState('binary_sensor.a', ${JSON.stringify(v === '2' ? 'off' : 'on')}); setState('sensor.power', '${400 + Number(v)}')`); await t.wait(3000); }
         // (the hour missing: 9:00 — the background asking older days meanwhile, not counted)
         const nine = d.getTime() - 80 * 60e3;
+        // (three refreshes: asked again once at most — to be sure it won't come, nothing having
+        // shown it when it was asked: see card-history.js _answered, _forgetToday)
         await t.step(`${what}: its last hour's statistics not asked again at each refresh`, async () => {
             const r = await t.E(`__ws.slice(${n0}).filter(w => w.type === 'recorder/statistics_during_period' && w.ids.includes('${id}') && Date.parse(w.start) <= ${nine} && Date.parse(w.end) > ${nine}).length`);
-            return r === 0 ? true : String(r);
+            return r <= 1 ? true : String(r);
         });
         done(await t.close());
     }
@@ -2244,7 +2238,8 @@ module.exports = async function()
         const r = await t.E(`(async()=>{ const I = el.instance, D = 86400e3, t1 = Date.now() - 5 * D; I._histFrom?.delete('sensor.power');
             await I._ask('history', t1 - D, t1, ['sensor.power'], { phase: 2 });
             return { from: I._histFrom?.get('sensor.power') ?? null, t1, lacking: I._lacking('hist', 'sensor.power', t1 - 3 * D, t1).length }; })()`);
-        return r.from === r.t1 && r.lacking === 0 ? true : JSON.stringify(r);
+        // (the time asked: whole seconds, as Home Assistant is asked — see _ask)
+        return r.from === Math.ceil(r.t1 / 1000) * 1000 && r.lacking === 0 ? true : JSON.stringify(r);
     });
     done(await t.close());
     // (an entity made 10 minutes ago, a window of 3 days asked in blocks: the older days empty —
@@ -2253,7 +2248,7 @@ module.exports = async function()
         { mock: { states: { 'sensor.new': { state: 7, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.new': [[600, '7']] } } });
     await t.wait(3000);
     await t.step('an entity made 10 minutes ago, a window of 3 days: its first value there, from its time', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, rows = I.cache.flatMap(s => s.hist.get('sensor.new') ?? []).filter(x => !x.live); return rows.map(x => Math.round(( Date.now() - +new Date(x.last_changed) ) / 60e3)); })()`);
+        const r = await t.E(`(()=>{ const I = el.instance, rows = ( I.cache.layers.hist.get('sensor.new')?.rows ?? [] ).filter(x => !x.live); return rows.map(x => Math.round(( Date.now() - +new Date(x.last_changed) ) / 60e3)); })()`);
         return r.length && r.some(m => m >= 9 && m <= 11) ? true : JSON.stringify(r);
     });
     done(await t.close());
@@ -2265,7 +2260,7 @@ module.exports = async function()
         t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }] }),
             { mock: { series: true, statsLag: 900 }, clock: d.toISOString() });
         await t.wait(3000);
-        const _nine = () => t.E(`(()=>{ const I = el.instance; return ( I.cache[I._slotAt(${nine})].stats.get('sensor.power') ?? [] ).some(x => +new Date(x.last_changed) === ${nine}); })()`);
+        const _nine = () => t.E(`(()=>{ const I = el.instance; return ( I.cache.layers.stats.get('sensor.power')?.rows ?? [] ).some(x => +new Date(x.last_changed) === ${nine}); })()`);
         const before = await _nine();
         await t.page.clock.fastForward('04:00');
         await t.E(`setState('sensor.power2', '302')`); await t.wait(4000);   // (a curve shown changing: a refresh)
@@ -2284,7 +2279,7 @@ module.exports = async function()
         t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }] }),
             { mock: { series: true, statsLag: 900 }, clock: d.toISOString() });
         await t.wait(3000);
-        const _nine = id => t.E(`(()=>{ const I = el.instance; return ( I.cache[I._slotAt(${nine})].stats.get('${id}') ?? [] ).some(x => +new Date(x.last_changed) === ${nine}); })()`);
+        const _nine = id => t.E(`(()=>{ const I = el.instance; return ( I.cache.layers.stats.get('${id}')?.rows ?? [] ).some(x => +new Date(x.last_changed) === ${nine}); })()`);
         const before = await _nine('sensor.power');
         await t.page.clock.fastForward('04:00');
         // (only the second entity's statistics asked once the hour is compiled: the card sees it compiled)

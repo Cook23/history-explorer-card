@@ -27,7 +27,8 @@ async function openCard(cfg, opts = {})
     await page.exposeFunction('__setUD', (k, v) => { userData[k] = v; });
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    let init = 'window.CFG=' + JSON.stringify({ ...cfg, cardName: (cfg.cardName || 'test') + Date.now() }) + ';';
+    // (the card's cache checked against its rules after each change: see card-history.js _checkCache)
+    let init = 'window.__HEC_CHECK_CACHE=true;window.__HEC_CACHE_ERRORS=[];window.CFG=' + JSON.stringify({ ...cfg, cardName: (cfg.cardName || 'test') + Date.now() }) + ';';
     if( opts.mock ) init += 'window.MOCK=' + JSON.stringify(opts.mock) + ';';
     if( opts.panel !== undefined ) init += 'window.PANEL_CFG=' + JSON.stringify(opts.panel) + ';';
     if( opts.init ) init += opts.init;
@@ -70,7 +71,15 @@ class Tester
             (this.errors.length > e0 ? '  PAGE ERRORS: ' + this.errors.slice(e0).join(' | ') : ''));
     }
 
-    async close() { await this.browser.close(); return { passed: this.passed, failed: this.failed }; }
+    // The page closed — the card's cache having broken none of its rules meanwhile (a test
+    // failed for each one broken, see card-history.js _checkCache)
+    async close()
+    {
+        const _broken = await this.E('window.__HEC_CACHE_ERRORS ?? []').catch(() => []);
+        if( _broken.length ) { this.failed++; console.log('  ✗ the cache\'s rules  -> ' + _broken.slice(0, 5).join(' | ') + ( _broken.length > 5 ? ` (+${_broken.length - 5})` : '' )); }
+        await this.browser.close();
+        return { passed: this.passed, failed: this.failed };
+    }
 
     // ── Mouse ──
     async drag(a, c, steps = 14)
