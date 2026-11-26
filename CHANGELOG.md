@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.92] - 2026-11-24
+## [v1.2.92] - 2026-11-26
 
 ### Added
 - The cursor line and the tooltips across graphs set by graph, as its alignment: `cursor.mode` and `cursor.types` on the card (as before), a graph, an entity or in `entityOptions`; `tooltip.mode: all`, with `cursor.mode: all`: the graph's tooltip opened at the line's time while the pointer is over another graph — *Behavior ▸ Cursor ▸* in a graph's menu and in the card's options menu: None, Graph pointed at, All graphs, All graphs with tooltips

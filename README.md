@@ -29,6 +29,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 ## 📋 Version highlights
 
+- **v1.2.92** — The tooltips of several graphs opened at once, at the cursor line's time.
 - **v1.2.88** — An arrowline's extremes: the spread of the direction around each arrow.
 - **v1.2.77** — YAML export; optimization stage end (up to 50× faster).
 - **v1.2.40** — Tooltip behaviors by screen size: selected curves, nearest, mixed or all.
