@@ -136,7 +136,7 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 
 | Option | Type | Default | Effect |
 |---|---|---|---|
-| `hecCursorLine` | `{ show, shared, color }` | none | A vertical line under the pointer while it's over the plot area (plugin `hecCursorLine`): drawn when `show`; with `shared`, on every chart of the same `dragScope` at once (the card's `cursor.mode: all`); `color` its stroke. |
+| `hecCursorLine` | `{ show, shared, tooltips, color }` | none | A vertical line at the time under the pointer while it's over the plot area (plugin `hecCursorLine`): drawn when `show`; with `shared`, on every chart of the same `dragScope` whose `shared` is true too, at that same time — each at its own time axis' pixel for it, wherever its plot area is (charts aligned or not); on those of them whose `tooltips` is true, their tooltip opened at that time (`hecShowTooltipAt()`), closed when the line goes; `color` its stroke. |
 
 ### Dataset options
 
@@ -204,6 +204,11 @@ timeline or arrowline).
 `chart.hecEndTooltip()` closes the chart's tooltip at once (removed, not faded out) and ends
 its tooltip mode, the point it showed back to its normal look, no hover dot — the card calls
 it on every chart when one of its menus opens, so nothing of a tooltip stays over the menu.
+
+`chart.hecShowTooltipAt(t)` opens the chart's tooltip at time `t` (ms): on each dataset shown,
+its element at that time, within the picking margin along the time axis (the first one alone
+with `tooltips.hecFirstOnly`); none there, it closes — another chart's cursor line, shared
+(`hecCursorLine`), opens it so (the plugin calls it, not the card).
 
 `chart.hecPlotWidth()` — the width of the chart's plot area in pixels (its whole width
 before its first layout): how many columns of pixels the time axis has, for a curve

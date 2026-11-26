@@ -686,7 +686,7 @@ export class CardStorage
     }
 
     // --- Last one to speak wins — the statistics export's period ---
-    // Kept on this device only, whatever the persistence options (as a curve's tooltip mode:
+    // Kept on this device only, whatever the persistence options (as a curve's tooltip behavior:
     // nothing another device would use); its YAML being csv.statisticsPeriod: the YAML's when
     // it spoke, else this device's
     _resolveExportStatsPeriod(_ls, _yamlImage)

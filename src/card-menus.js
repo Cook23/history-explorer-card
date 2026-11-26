@@ -7,7 +7,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { typesCompatible, INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES, allPointsShown, FILL_VALUES, LINE_WIDTHS, Y_AXIS_SIDES, LINE_MODES, LINE_MODE_LABELS } from "./history-options.js";
+import { typesCompatible, INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_BEHAVIORS, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES, allPointsShown, FILL_VALUES, LINE_WIDTHS, Y_AXIS_SIDES, LINE_MODES, LINE_MODE_LABELS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
@@ -43,12 +43,23 @@ const _CURVE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export' };
 // The behavior submenu's lines (<prefix>_<key>): the tooltip (▸: its modes, in a submenu over
 // it), the Y axis (▸: its sides, its lock), and the curves' place in the card —
 // for an entity: separate, merge back, cut, delete; for a graph: merge back, cut, delete it
-const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', yaxis: 'ui.menu.yaxis', split: 'ui.menu.entity_split',
+const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', cursor: 'ui.menu.cursor', yaxis: 'ui.menu.yaxis', split: 'ui.menu.entity_split',
                             merge: 'ui.menu.entity_merge', cut: 'ui.menu.entity_cut',
                             delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
-// The tooltip's modes, as the curves show it (see tooltipModeOf): the curves selected (a click
+// The tooltip's behaviors, as the curves show it (see tooltipBehaviorOf): the curves selected (a click
 // on one), the one nearest the pointer, both, every one
-const _TOOLTIP_MODES = TOOLTIP_MODES.map(v => [v, 'ui.menu.tooltip_' + v]);
+const _TOOLTIP_BEHAVIORS = TOOLTIP_BEHAVIORS.map(v => [v, 'ui.menu.tooltip_' + v]);
+// The cursor submenu's choices — only those that go together (a graph's cursor.mode,
+// tooltip.mode — see card-charts.js cursorLineOf): none; on the graph pointed at; on every graph
+// in all at once; and their tooltips opened at that time too (never tooltips opened on
+// other graphs without the line there). Each: its options (a choice made, for the graph
+// whatever its type: cursor.types all), its name
+const _CURSOR_CHOICES = {
+    hide:     { cursorMode: 'hide', tooltipMode: 'auto' },
+    graph:    { cursorMode: 'auto', tooltipMode: 'auto' },
+    all:      { cursorMode: 'all', tooltipMode: 'auto' },
+    tooltips: { cursorMode: 'all', tooltipMode: 'all' },
+};
 // The appearance submenu: the curve's color (the browser's color picker), and five lists,
 // each opened in the submenu itself, over it (← or Escape: back) — its points (none, the
 // hovered one, all), its extremes (its min/max band: none, where, which sides), its fill,
@@ -955,20 +966,27 @@ export class CardMenus
                                          choose: () => this._interpolationChosen(m, k) }));
     }
 
-    // The behavior submenu (list null): the tooltip (▸, for curves), the Y axis (▸: for curves,
+    // The behavior submenu (list null): the tooltip (▸, for curves), the cursor (▸, for a graph
+    // or the card: its choices, _CURSOR_CHOICES — the one all their graphs have in bold), the Y axis (▸: for curves,
     // left, right — the one they all are on in bold —; when a graph has a lock — an entity's:
     // its graph's —, the lock, a switch on when all are locked), and in the card's menu (not the info panel's) the curves' place — for an entity from
     // its label: separate, merge back, cut, delete; for a graph: merge back, cut, delete (one
-    // added from the card) — or the tooltip's modes, the one all the curves have in bold
+    // added from the card) — or the tooltip's behaviors, the one all the curves have in bold
     _behaviorItems(m, list)
     {
         const { kind, pairs } = this._scopeOf(m);
         const _curves = this._menuCurves(m);
         if( list === 'tooltip' ) {
-            const _modes = new Set(_curves.map(({ e }) => this.tooltipModeOf(e)));
-            const _cur = _modes.size === 1 ? [..._modes][0] : undefined;
-            return _TOOLTIP_MODES.map(([v, label]) => ({ id: `${m.prefix}_tooltip_${v}`, label: i18n(label), marked: v === _cur, final: true,
+            const _behaviors = new Set(_curves.map(({ e }) => this.tooltipBehaviorOf(e)));
+            const _cur = _behaviors.size === 1 ? [..._behaviors][0] : undefined;
+            return _TOOLTIP_BEHAVIORS.map(([v, label]) => ({ id: `${m.prefix}_tooltip_${v}`, label: i18n(label), marked: v === _cur, final: true,
                                                          choose: () => this._behaviorChosen(m, 'tooltip', v) }));
+        }
+        if( list === 'cursor' ) {
+            const _now = new Set(pairs.map(({ g }) => this._cursorChoiceOf(g)));
+            const _cur = _now.size === 1 ? [..._now][0] : undefined;
+            return Object.keys(_CURSOR_CHOICES).map(v => ({ id: `${m.prefix}_cursor_${v}`, label: i18n('ui.menu.cursor_' + v), marked: v === _cur, final: true,
+                                                           choose: () => this._behaviorChosen(m, 'cursor', v) }));
         }
         if( list === 'yaxis' ) {
             const _sides = new Set(_curves.map(({ g, e }) => this.yAxisSideOf(g, e)));
@@ -987,6 +1005,7 @@ export class CardMenus
         const _locks = this._yLocks(m);
         const _shown = {
             tooltip: _curves.length > 0,
+            cursor: ( kind === 'graph' || kind === 'card' ) && pairs.length > 0,
             yaxis: _curves.length > 0 || _locks.length > 0,
             split: _full && kind === 'entity' && _menu._menuFrom === 'label' && this.canSplitCurve(_g),
             merge: _full && ( kind === 'graph' || ( kind === 'entity' && _menu._menuFrom === 'label' ) ) && this.canMergeGraphUp(_g),
@@ -996,9 +1015,17 @@ export class CardMenus
         };
         return Object.keys(_BEHAVIOR_ENTRIES).filter(k => _shown[k]).map(k => {
             const _label = i18n(_BEHAVIOR_ENTRIES[k]);
-            if( k === 'tooltip' || k === 'yaxis' ) return this._submenuLine(m, `${m.prefix}_behavior_${k}`, _label, ['behavior', k]);
+            if( k === 'tooltip' || k === 'cursor' || k === 'yaxis' ) return this._submenuLine(m, `${m.prefix}_behavior_${k}`, _label, ['behavior', k]);
             return { id: `${m.prefix}_${k}`, label: _label, choose: () => this._behaviorChosen(m, k) };
         });
+    }
+
+    // Graph g's choice of the cursor submenu (_CURSOR_CHOICES), as its options draw it now
+    // (cursorLineOf): none, on it, on every graph in all, and their tooltips too
+    _cursorChoiceOf(g)
+    {
+        const c = this.cursorLineOf(g.type, g.entities[0]);
+        return c.tooltips ? 'tooltips' : c.shared ? 'all' : c.show ? 'graph' : 'hide';
     }
 
     // --------------------------------------------------------------------------------------
@@ -1516,7 +1543,8 @@ export class CardMenus
         this._menuChosen(m);
     }
 
-    // Behavior: the tooltip's mode of the curves (value), or the Y axes locked or released
+    // Behavior: the tooltip's behavior of the curves (value), the graphs' cursor (a choice of
+    // _CURSOR_CHOICES), or the Y axes locked or released
     // (a switch, as a click on the padlock: all the graphs locked, unless they all are) — the
     // menu showing it a moment —; the entity taken out into its own graph (as a double-click
     // on its label), its linked graph merged back into the one above (as a double-click on
@@ -1529,6 +1557,10 @@ export class CardMenus
         const { kind, pairs } = this._scopeOf(m);
         if( action === 'tooltip' ) {
             for( const { g, curves } of this._curvesByGraph(m) ) this.setCurvesTooltip(g, curves, value);
+            return this._menuChosen(m);
+        }
+        if( action === 'cursor' ) {
+            for( const { g } of pairs ) this.setGraphCursor(g, { ..._CURSOR_CHOICES[value], cursorTypes: value === 'hide' ? undefined : ['all'] });
             return this._menuChosen(m);
         }
         if( action === 'yaxis' ) {

@@ -37,11 +37,11 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: add, display (open), appearance, interpolation, behavior (the tooltip, the Y axis — its lock, a switch, in it —, cut)', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: add, display (open), appearance, interpolation, behavior (the tooltip, the cursor, the Y axis — its lock, a switch, in it —, cut)', async () => {
         await graphMenu('rain');
         const m = await menu(); await click('behavior'); const l = await menu();
         return m === 'rain || Add ▸ | Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
-            && l === 'rain || Add ▸ | Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* | Export ▸ || Tooltip ▸ | Y axis ▸ | Cut' ? true : `${m} / ${l}`;
+            && l === 'rain || Add ▸ | Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* | Export ▸ || Tooltip ▸ | Cursor ▸ | Y axis ▸ | Cut' ? true : `${m} / ${l}`;
     });
     await t.step('reopened within 10 s of being closed, a menu opens the submenu it had open; later, its default one', async () => {
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
@@ -49,7 +49,7 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(10500);
         await graphMenu('rain'); const late = await menu();
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
-        return /Behavior ▸\* \| Export ▸ \|\| Tooltip ▸ \| Y axis ▸ \| Cut/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
+        return /Behavior ▸\* \| Export ▸ \|\| Tooltip ▸ \| Cursor ▸ \| Y axis ▸ \| Cut/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
     });
     await t.step('Behavior ▸ Y axis ▸ Locked, a switch: on, the axis locked; the menu then shows it on, and off releases it', async () => {
         const sw = () => t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`);
@@ -285,7 +285,7 @@ module.exports = async function()
     const lCurves = what => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.entities.map((e,i)=>{ const d=g.chart.data.datasets[i]; return ${what}; }).join(' ')).join(' | ')`);
     const TIP = ['behavior', 'behavior_tooltip'], TIPBOX = 'behavior_tooltip_sub';
     await t.step('the tooltip: All from the card\'s menu, Selected on a curve, Nearest on its graph, Selected from the card: each time the last one to speak wins, for each curve it concerns', async () => {
-        const mode = () => lCurves(`el.instance.tooltipModeOf(e)+'/'+d.hecTooltip`);
+        const mode = () => lCurves(`el.instance.tooltipBehaviorOf(e)+'/'+d.hecTooltip`);
         await lViaCard(TIP, TIPBOX, 'All'); const a = await mode();
         await lViaCurve(0, 0, TIP, TIPBOX, 'Selected'); const b = await mode();
         await lViaGraph(0, TIP, TIPBOX, 'Nearest'); const c = await mode();
@@ -355,6 +355,28 @@ module.exports = async function()
         });
         done(await t.close());
     }
+
+    // ── Behavior ▸ Cursor: the graph's cursor line and tooltips across graphs, as its alignment ──
+    t = await openCard(card({ graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] } ] }), { height: 1200, mock: { series: true } });
+    await t.wait(1500);
+    await t.step('Behavior ▸ Cursor ▸ in a line graph\'s menu, after Tooltip: its choices only (none, the graph pointed at, every graph, every graph with tooltips), None in bold (cursor.types: timeline); All graphs, with tooltips chosen — saved on its entities, drawn so, exported as cursor and tooltip', async () => {
+        const sub = () => t.E(`(()=>{ const s=[...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(x=>x.style.display!=='none').pop(); return s?[...s.querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '):''; })()`);
+        await t.longPress(await t.E(`moPt(0)`)); await t.wait(500);
+        await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(400);
+        const r = { lines: await sub() };
+        await t.E(`el.querySelector('#et_0_behavior_cursor').click()`); await t.wait(400);
+        r.list = await sub();
+        await t.E(`el.querySelector('#et_0_cursor_tooltips').click()`); await t.wait(1200);
+        r.saved = await t.E(`el.instance.graphsInDisplayOrder()[0].entities.map(e=>[e.cursorMode,e.cursorTypes.join('+'),e.tooltipMode].join('/')).join()`);
+        r.line = await t.E(`JSON.stringify(el.instance.graphsInDisplayOrder().map(g=>g.chart.options.plugins.hecCursorLine).map(o=>[o.show,o.shared,o.tooltips]))`);
+        r.yaml = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0], o=el.instance.yamlObject({ kind: 'graph', g }, false); return JSON.stringify([o.cursor, o.tooltip, 'cursorMode' in o]); })()`);
+        return /^Tooltip ▸ \| Cursor ▸ \| Y axis/.test(r.lines) && r.list === 'None* | Graph pointed at | All graphs | All graphs, with tooltips' && r.saved === 'all/all/all'
+            && r.line === '[[true,true,true],[false,false,false],[true,false,false]]' && r.yaml === '[{"mode":"all","types":["all"]},{"mode":"all"},false]' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
 
     return { passed, failed };
 };

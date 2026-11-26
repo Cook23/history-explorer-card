@@ -2,9 +2,9 @@
 // long-term statistics), filled on demand for the time window shown, and the user's own
 // state process function. Part of HistoryCardState (added to it in history-explorer-card.js).
 
-import { optionSeriesIdsOf } from "./card-datasets.js";
+import { optionSeriesIdsOf, optionSeriesOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
-import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS, configWarning } from "./history-options.js";
+import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS, INDIRECT_OPTIONS, configWarning } from "./history-options.js";
 import { HORIZON } from "./card-yscale.js";
 import { perf, REDRAW_CAUSES } from "./card-perf.js";
 import { haRequests, HA_WORKERS } from "./ha-requests.js";
@@ -31,9 +31,6 @@ const AUTO_REFRESH_MIN_MS = 2000, AUTO_REFRESH_BUILD_FACTOR = 5;
 // A year's days, and the cache's days at most: twice the longest time range, for the window
 // to be moved back a whole range
 const YEAR_DAYS = YEAR_HOURS / 24, CACHE_MAX_DAYS = 2 * MAX_RANGE_YEARS * YEAR_DAYS;
-// The start of the day n days after day d (a date or a slot's start), as a cache slot's
-// bounds are written: local time, "YYYY-MM-DDT00:00:00"
-const dayAfter = (d, n) => moment(d).add(n, "day").format("YYYY-MM-DD") + "T00:00:00";
 // Where each kind of request goes in a cache slot: the history (by hours), the 5-minute
 // statistics, the statistics of the period, the daily, weekly and monthly ones — from the finest
 const LAYER = { month: 'month', week: 'week', day: 'day', stats: 'stats', fine: 'fine', history: 'hist' };
@@ -85,10 +82,41 @@ let probesRead = false;
 // took it back or it came back (leavePage, backOnPage)
 const PAGE_CACHES = new Map(), PAGE_CACHE_KEPT_MS = 10 * 60e3;
 const HOUR_MS = 3600e3, DAY_MS = 86400e3;
-// (time t, ms, at the start of its hour — days: of its day, at local midnight —, or at the
-// end: the next one, unless t is one)
-const alignDown = (t, days) => days ? moment(t).startOf('day').valueOf() : Math.floor(t / HOUR_MS) * HOUR_MS;
-const alignUp = (t, days) => { const f = alignDown(t, days); return f < t ? ( days ? moment(f).add(1, 'day').valueOf() : f + HOUR_MS ) : f; };
+// Every time in the cache is UTC (ms since 1970) — the local time only for the display. Times
+// on a grid of UTC (ms): t at the start of its step, or at the end — the next one, unless t is one
+const gridDown = (t, step) => Math.floor(t / step) * step, gridUp = (t, step) => Math.ceil(t / step) * step;
+// (a time as Home Assistant is asked: UTC, to the second — "2026-11-24T23:00:00Z")
+const utcText = t => new Date(Math.floor(msOf(t) / 1000) * 1000).toISOString().replace('.000Z', 'Z');
+// Home Assistant's calendar — its time zone (tz: hass.config.time_zone; none: this device's) —:
+// its daily, weekly (from Monday) and monthly statistics are its days, weeks and months
+// there → { start(t, unit): the start of the one holding t, add(t, n, unit): n of them after
+// the one starting at t } (ms; unit 'day', 'week' or 'month')
+const CALENDARS = new Map();
+function haCalendar(tz)
+{
+    if( CALENDARS.has(tz) ) return CALENDARS.get(tz);
+    let fmt;
+    try { fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz || undefined, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }); }
+    catch( e ) { fmt = new Intl.DateTimeFormat('en-US', { hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }); }
+    const _parts = t => { const o = {}; for( const p of fmt.formatToParts(new Date(t)) ) o[p.type] = Number(p.value); return o; };
+    // (how far the zone's time is from UTC at t; the time of a date's midnight there)
+    const _offset = t => { const p = _parts(t); return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(t / 1000) * 1000; };
+    const _midnight = (y, m, d) => { const u = Date.UTC(y, m, d); return u - _offset(u - _offset(u)); };
+    const _day = p => new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
+    const cal = {
+        start(t, unit) {
+            const p = _parts(t);
+            if( unit === 'month' ) return _midnight(p.year, p.month - 1, 1);
+            return _midnight(p.year, p.month - 1, p.day - ( unit === 'week' ? ( _day(p) + 6 ) % 7 : 0 ));
+        },
+        add(t, n, unit) {
+            const p = _parts(t);
+            return unit === 'month' ? _midnight(p.year, p.month - 1 + n, 1) : _midnight(p.year, p.month - 1, p.day + n * ( unit === 'week' ? 7 : 1 ));
+        },
+    };
+    CALENDARS.set(tz, cal);
+    return cal;
+}
 // The state in force a request of the history began at (b: see _mergeLayer) — no change of
 // the sensor — left out where the row before it gives the same: never drawn, exported or
 // counted as a value (a point at midnight that was never recorded, a silence cut in two); kept
@@ -136,16 +164,44 @@ function mergeRows(a, b)
         out.push(j >= b.length || ( i < a.length && msOf(a[i].last_changed) <= msOf(b[j].last_changed) ) ? a[i++] : b[j++]);
     return out;
 }
-// (ranges [a, b) in order: one more added, those touching it joined)
-function addRange(list, a, b)
+// (rows in time order: the index of the first one at time t or later — after: later than t)
+function rowIndex(rows, t, after = false)
+{
+    let lo = 0, hi = rows.length;
+    while( lo < hi ) {
+        const m = ( lo + hi ) >> 1, x = msOf(rows[m].last_changed);
+        if( after ? x <= t : x < t ) lo = m + 1; else hi = m;
+    }
+    return lo;
+}
+// (a track's spans — in time order, never overlapping, each { a, b, at, stale }, see the
+// cache —: [a, b) set to v, the parts of the others there taken out)
+function setSpan(spans, a, b, v)
 {
     const out = [];
-    for( const r of [...list, [a, b]].sort((p, q) => p[0] - q[0]) ) {
+    for( const s of spans ) {
+        if( s.b <= a || s.a >= b ) { out.push(s); continue; }
+        if( s.a < a ) out.push({ ...s, b: a });
+        if( s.b > b ) out.push({ ...s, a: b });
+    }
+    out.push({ ...v, a, b });
+    return out.sort((p, q) => p.a - q.a);
+}
+// (spans in time order — those keep takes —: their time as ranges [a, b), those touching joined)
+function rangesOf(spans, keep = null)
+{
+    const out = [];
+    for( const s of spans ) {
+        if( keep && !keep(s) ) continue;
         const l = out[out.length - 1];
-        if( l && r[0] <= l[1] ) l[1] = Math.max(l[1], r[1]); else out.push([r[0], r[1]]);
+        if( l && s.a <= l[1] ) l[1] = Math.max(l[1], s.b); else out.push([s.a, s.b]);
     }
     return out;
 }
+// (a span known: not to be asked again — see _forgetToday)
+const known = s => !s.stale;
+// An empty cache holding the time from `from` (ms) on: by layer, by series, its track (see the cache)
+const newStore = from => ({ from, layers: Object.fromEntries(LAYERS.map(l => [l, new Map()])) });
 // (the parts of [a, b) outside ranges list, in order)
 function outside(a, b, list)
 {
@@ -174,9 +230,30 @@ const AHEAD_MAX_ROWS = 300000;
 // days farthest from the window first, their history first, then their 5-minute
 // statistics, the hourly and daily ones last; never the window nor a window on each side
 const CACHE_MAX_ROWS = 500000;
+// Home Assistant's clock, not this device's (see _haNow): every time Home Assistant gives —
+// a state's last update (every state looked at once every HA_CLOCK_SCAN_MS at most), a value
+// of its history, the end of a period of its statistics — telling how far its clock is ahead
+// of this device's steady one (performance.now: never set) at least: the most it told, kept —
+// Home Assistant's now never told earlier than it was before
+const HA_CLOCK_SCAN_MS = 5000;
+// (this device's steady clock, ms — on the same scale as Date.now when the page opened —: every
+// time this device measures — how long since, how long until — never its clock, which may be set)
+const steadyNow = () => performance.timeOrigin + performance.now();
+// What the page knows of its Home Assistant — one for every card of the page, whatever cache
+// each has (a card made again shares its cache, see PAGE_CACHES): how far its clock is ahead of
+// this device's steady one at least (ahead — see _noteHaTime), when its states were last looked
+// at for it (scanned), and how far it was seen to have compiled its statistics, 5-minute and
+// hourly (compiled, by compiledOf — see _answered)
+const HA_KNOWN = { ahead: undefined, scanned: -Infinity, compiled: new Map() };
 // How late Home Assistant may be with a period's statistics: it compiles them once the
 // period has ended (within seconds — room left for it being slow)
 const STATS_LAG = 10 * 60e3;
+// What Home Assistant compiles: its 5-minute and hourly statistics, once their period has
+// ended — its daily, weekly and monthly ones made from the hourly ones when asked (the one
+// going on given too, so far). A statistics row final once the 5 minutes, or the hour, holding
+// its end were compiled (see _answered)
+const compiledOf = name => name === FINE_PERIOD ? FINE_PERIOD : 'hour';
+const CALENDAR_UNITS = { day: 'day', week: 'week', month: 'month' };
 // The longest Home Assistant's recorder may take to write a state in the history: well above
 // its commit_interval (5 s by default) — an empty history for a time ended earlier than that
 // before it was asked tells there is none, never one not written yet
@@ -185,48 +262,115 @@ const RECORDER_WRITE_MAX_MS = 3600e3;
 export class CardHistory
 {
     // --------------------------------------------------------------------------------------
-    // The cache: a slot a day, from cacheSize days ago to today (the last one — more added
-    // as the days pass, _extendToNow). In each, by entity, its history (hist), its 5-minute
-    // statistics (fine) and its statistics of the period, hourly by default (stats), as rows
-    // — { last_changed, state }, a statistics row also statistics: { end, min, mean, max } —,
-    // the daily, weekly and monthly ones too; an entity's rows
-    // there only once loaded (an empty list: loaded, nothing in it); in each layer, when
-    // each entity's rows were asked (askedAt: before the day's end, they lack what came
-    // since), and the time they cover (cover: [from, to) ranges) — every source alike: what's
-    // lacking is what isn't covered (_lacking), a refresh cutting each one's cover at the
-    // time it was asked (_forgetToday), the rows there kept and drawn until the new ones
-    // come; the hourly statistics and coarser by whole days, the history and the 5-minute
-    // ones as they're asked — by whole hours, a refresh what came since (the history's blocks:
-    // their state at the start, given with each, a boundary, b)
+    // The cache (this.cache: see newStore), from `from` (cacheSize days ago at first — further
+    // back as far as the background fills it, _growCache) on: by layer — the history (hist),
+    // the 5-minute statistics (fine), the statistics of the period, hourly by default (stats),
+    // the daily, weekly and monthly ones —, by series, a track: its rows in time order —
+    // { last_changed, state }, a statistics row also statistics: { end, min, mean, max } —,
+    // a row's time its only place, and its spans: the time asked, in order, each { a, b, at:
+    // when it was asked, stale: to be asked again }. A span holds every row of its time Home
+    // Assistant had when it was asked; the history's first row there, its state at the start,
+    // given with each request (a boundary, b: see _mergeLayer). What's lacking is what no known
+    // span holds (_lacking); a refresh makes the part of a span asked before its end stale
+    // (_forgetToday), its rows kept and drawn until the new ones come; nothing was ever asked
+    // where no span is: a gap, never drawn over (see cachedHistory). A state Home Assistant
+    // pushes: a row at once (addLiveState). The statistics asked by whole days, the history
+    // and the 5-minute ones by whole hours — Home Assistant's periods —, none of it kept by day
     // --------------------------------------------------------------------------------------
 
-    _slot(d, e)
+    // Is the cache made (initCache)?
+    _cacheReady()
     {
-        const _by = f => Object.fromEntries(LAYERS.map(l => [l, f()]));
-        return { start: d, end: e, start_m: moment(d), end_m: moment(e), a: msOf(d), b: msOf(e), ..._by(() => new Map()), askedAt: _by(() => new Map()), cover: _by(() => new Map()) };
+        return !!this.cache?.layers;
+    }
+
+    // Series id's track in a layer (see the cache) — make: made when there's none; else
+    // undefined for none
+    _track(layer, id, make = false)
+    {
+        const m = this.cache.layers[layer];
+        let t = m.get(id);
+        if( !t && make ) m.set(id, t = { rows: [], spans: [] });
+        return t;
+    }
+
+    // A time Home Assistant gave (ms): its clock at that time at least (see HA_CLOCK_SCAN_MS)
+    _noteHaTime(t)
+    {
+        if( Number.isFinite(t) ) HA_KNOWN.ahead = Math.max(HA_KNOWN.ahead ?? -Infinity, t - steadyNow());
+    }
+
+    // The states Home Assistant gives (hass): their newest last update (see _noteHaTime)
+    noteHaClock(hass)
+    {
+        const _now = steadyNow();
+        if( _now - HA_KNOWN.scanned < HA_CLOCK_SCAN_MS ) return;
+        HA_KNOWN.scanned = _now;
+        let lu = -Infinity;
+        for( const st of Object.values(hass?.states ?? {}) ) { const t = Date.parse(st?.last_updated); if( t > lu ) lu = t; }
+        this._noteHaTime(lu);
+    }
+
+    // Home Assistant's now (ms) — never later than it is: the time an answer is known as of
+    // (a span's at), never this device's clock, which may be set otherwise (see _noteHaTime) —
+    // this device's, until Home Assistant has given a time
+    _haNow()
+    {
+        return HA_KNOWN.ahead !== undefined ? steadyNow() + HA_KNOWN.ahead : Date.now();
+    }
+
+    // How far Home Assistant may have values (ms): the later of this device's now and Home
+    // Assistant's (_haNow) — what is asked goes there: asking past what it has costs nothing,
+    // knowing it never comes from that (see _haNow)
+    askNow()
+    {
+        return Math.max(Date.now(), this._haNow());
+    }
+
+    // What the cache holds against its rules (see the cache), checked after each change
+    // while the tests ask for it (window.__HEC_CHECK_CACHE): each broken rule put in
+    // window.__HEC_CACHE_ERRORS — where (the change), the layer, the series, what's wrong.
+    // In each track: its rows in time order, never two of the same time where one is the
+    // card's own (a state pushed, live; a request's start, b) — Home Assistant's alone may
+    // share a time, as it gives them —; its spans in order,
+    // never overlapping nor empty; every row but a state pushed (live) within a span; the
+    // history: no state at a request's start (b) where all the time from the row before it is
+    // known — the same, dropped; another, a value recorded there (see _putRows)
+    _checkCache(where)
+    {
+        if( !window.__HEC_CHECK_CACHE || !this._cacheReady() ) return;
+        const _err = (l, id, what) => ( window.__HEC_CACHE_ERRORS ??= [] ).push(`${where} ${l} ${id}: ${what}`);
+        for( const l of LAYERS ) for( const [id, tr] of this.cache.layers[l] ) {
+            const { rows, spans } = tr, _t = k => msOf(rows[k].last_changed);
+            for( let k = 1; k < rows.length; k++ ) {
+                const d = _t(k) - _t(k - 1), _own = x => x.live || x.b;
+                if( !( d >= 0 ) || d < 1 && ( _own(rows[k]) || _own(rows[k - 1]) ) ) { _err(l, id, `rows out of order or of the same time at ${_t(k)}`); break; }
+            }
+            for( let k = 0; k < spans.length; k++ ) if( !( spans[k].b > spans[k].a ) || k && spans[k].a < spans[k - 1].b ) { _err(l, id, `spans overlapping or empty at ${spans[k].a}`); break; }
+            const _all = rangesOf(spans);
+            const _out = rows.find(x => !x.live && !_all.some(([a, b]) => a <= msOf(x.last_changed) && msOf(x.last_changed) < b));
+            if( _out ) _err(l, id, `a row outside the spans at ${msOf(_out.last_changed)}`);
+            if( l === 'hist' ) for( let k = 1; k < rows.length; k++ ) {
+                const x = rows[k], p = rows[k - 1], t = _t(k);
+                if( x.b && !p.live && this._knownSince(tr, p, x) ) { _err(l, id, `a request's start where the time before it is known at ${t}`); break; }
+            }
+        }
     }
 
     initCache()
     {
-        // (a card made again: the page's cache of this card — a copy of its list of slots, the
-        // slots shared —, what came since it was asked to be asked again)
+        // (a card made again: the page's cache of this card, what came since it was asked to
+        // be asked again)
         const _page = PAGE_CACHES.get(this.pageKey);
         clearTimeout(_page?.tid);
-        if( _page?.cache.length ) {
-            appendAll(this.cache, _page.cache);
-            this.cacheSize = this.cache.length - 1;
+        if( _page?.cache?.layers ) {
+            this.cache = _page.cache;
             PAGE_CACHES.set(this.pageKey, { cache: this.cache });
             this._forgetToday();
             return;
         }
+        this.cache = newStore(gridDown(Date.now(), DAY_MS) - this.cacheSize * DAY_MS);
         PAGE_CACHES.set(this.pageKey, { cache: this.cache });
-        let d = dayAfter(moment(), -this.cacheSize);
-
-        for( let i = 0; i < this.cacheSize+1; i++ ) {
-            let e = dayAfter(d, 1);
-            this.cache.push(this._slot(d, e));
-            d = e;
-        }
     }
 
     // The card off the page: its cache let go PAGE_CACHE_KEPT_MS later — unless a card made
@@ -244,67 +388,29 @@ export class CardHistory
     {
         const _page = PAGE_CACHES.get(this.pageKey);
         if( _page?.cache === this.cache ) clearTimeout(_page.tid);
-        else if( this.cache.length && !_page ) PAGE_CACHES.set(this.pageKey, { cache: this.cache });
+        else if( this._cacheReady() && !_page ) PAGE_CACHES.set(this.pageKey, { cache: this.cache });
     }
 
-    growCache(growSize)
+    // The time the cache holds widened by days days back (CACHE_MAX_DAYS at most)
+    _growCache(days)
     {
         if( this.cacheSize >= CACHE_MAX_DAYS ) return;
-
-        let e = this.cache[0].start;
-
-        for( let i = 0; i < growSize; i++ ) {
-            let d = dayAfter(e, -1);
-            this.cache.unshift(this._slot(d, e));
-            e = d;
-        }
-
-        this.cacheSize += growSize;
-    }
-
-    // Slots added for the days begun since the cache was made (a page left open past
-    // midnight: today is a new slot)
-    _extendToNow()
-    {
-        while( msOf(this.cache[this.cache.length - 1].end) <= Date.now() ) {
-            const d = this.cache[this.cache.length - 1].end;
-            this.cache.push(this._slot(d, dayAfter(d, 1)));
-            this.cacheSize++;
-        }
-    }
-
-    // The cache slot holding time t, the start of a time span (a slot's start in it, its end
-    // not): before the cache, its first; after it, -1
-    mapStartTimeToCacheSlot(t)
-    {
-        const m = msOf(t), n = this.cache.length;
-        if( !n || m >= this.cache[n - 1].b ) return -1;
-        return m < this.cache[0].a ? 0 : this._slotAt(m);
-    }
-
-    // The cache slot holding time t, the end of a time span (a slot's end in it, its start
-    // not): after the cache, its last; before it, -1
-    mapEndTimeToCacheSlot(t)
-    {
-        const m = msOf(t), n = this.cache.length;
-        if( !n || m <= this.cache[0].a ) return -1;
-        return m > this.cache[n - 1].b ? n - 1 : this._slotAt(m - 1);
+        this.cache.from -= days * DAY_MS;
+        this.cacheSize += days;
     }
 
     // The last state of entity id (a series id) in the cache that tells something (not
-    // isMissingState) — the latest slot first, every layer's rows —; undefined when the cache
-    // has none (nothing asked for it: never asked here)
+    // isMissingState) — the latest of every layer's rows —; undefined when the cache has none
+    // (nothing asked for it: never asked here)
     lastUsableState(id)
     {
-        for( let i = ( this.cache?.length ?? 0 ) - 1; i >= 0; i-- ) {
-            let _best;
-            for( const layer of LAYERS ) {
-                const r = this.cache[i][layer]?.get(id)?.findLast(x => x.state !== undefined && x.state !== null && !isMissingState(x.state));
-                if( r && ( !_best || msOf(r.last_changed) > msOf(_best.last_changed) ) ) _best = r;
-            }
-            if( _best ) return _best.state;
+        if( !this._cacheReady() ) return undefined;
+        let _best;
+        for( const layer of LAYERS ) {
+            const r = this._track(layer, id)?.rows.findLast(x => x.state !== undefined && x.state !== null && !isMissingState(x.state));
+            if( r && ( !_best || msOf(r.last_changed) > msOf(_best.last_changed) ) ) _best = r;
         }
-        return undefined;
+        return _best?.state;
     }
 
     // The entities whose history is loaded: those shown, and the series a shown entity's
@@ -338,17 +444,17 @@ export class CardHistory
         return [...ids];
     }
 
-    // The angles among the entities with statistics — circular (see circularPeriodOf) wherever
-    // one of its uses takes it as such, the entity being in the cache once —, but those of
-    // state class measurement_angle: Home Assistant averages the others as plain numbers —
-    // wrong across 0 —, so their history is asked besides wherever they're drawn from
-    // statistics (see _askMissing); a measurement_angle's statistics are a circular mean
-    // (Home Assistant's sensor/recorder.py), drawn as any other's
+    // The angles among the series with statistics — circular (see circularPeriodOf) wherever
+    // one of its uses takes it as such: a curve shown, or an option's entity (a color, a fill,
+    // an arrow's length — its own circular, as every option's levels give it), the series being
+    // in the cache once —, but those of state class measurement_angle: Home Assistant averages
+    // the others as plain numbers — wrong across 0 —, so their history is asked besides
+    // wherever they're drawn from statistics (see _askMissing); a measurement_angle's
+    // statistics are a circular mean (Home Assistant's sensor/recorder.py), read as any other's
     _angleIds(statIds)
     {
-        const _angles = new Set();
-        for( const g of this.graphs ) for( const e of g.entities )
-            if( this.circularPeriodOf(e) && this.getStateClass(e.entity) !== 'measurement_angle' ) _angles.add(e.entity);
+        const _uses = [...this.graphs.flatMap(g => g.entities), ...[...this.optionSeriesIds()].map(id => ({ entity: id, circular: this.resolveOption({ entity: id }, 'circular') }))];
+        const _angles = new Set(_uses.filter(e => this.circularPeriodOf(e) && this.getStateClass(e.entity) !== 'measurement_angle').map(e => e.entity));
         return statIds.filter(id => _angles.has(id));
     }
 
@@ -371,56 +477,81 @@ export class CardHistory
         return this.statistics.force && S[1] ? S[1].kind : 'history';
     }
 
-    // An entity's rows over cache slots c0 to c1 — in each slot, the finest it has over the
-    // time each source covers: its history, else its 5-minute statistics, its statistics of
-    // the period…; and before the first row of a finer one, the coarser ones (where the
-    // recorder no longer keeps the history or the 5-minute statistics: a day past their
-    // retention, or the day it begins) — with, first, its last value before c0 when an earlier slot has it, so that
-    // the graphs have one value just before the start of their own data (no interpolation
-    // issue at the start of a curve, no state disappearing at the start of a timeline).
-    // Empty when the cache has none. What the cache has is drawn at once, however coarse —
-    // the daily statistics, the hourly ones, the 5-minute ones —, a finer layer replacing it
-    // as it comes. The times of slots c0 to c1 the cache has nothing of yet — no source it may
-    // be drawn from loaded there, until now —: their spans [a, b] (notLoaded), never drawn over
-    cachedHistory(entity, c0, c1, layers = null)
+    // What the window reads (ms) — and so what's asked for it (_askMissing): each curve's time
+    // (rowsSpan: the window and the whole groups at its edges), by graph, in its order
+    // (curves); each series an option reads (series): over the time of the curves it's read
+    // for — a color, a fill —, and for an arrow's length the time around the window its scale
+    // looks at too (yScaleRange: as an automatic Y axis); all of them together (all: [from, to])
+    readSpans()
     {
-        const _end = x => msOf(x.statistics?.end ?? x.last_changed);
-        // (layers: those it may be drawn from, the first preferred — see _drawLayers —; else
-        // every one, the finest first)
-        const _layers = layers ?? LAYERS;
-        const _rows = s => _layers.reduceRight((under, layer) => {
-            const a = s[layer].get(entity);
-            if( !a || !under?.length ) return a ?? under;
-            // (the ones after where it doesn't cover, before its first row there — the recorder
-            // no longer keeping it —, or after its last statistics — not compiled yet)
-            const cov = s.cover[layer].get(entity) ?? [], _first = a.length ? msOf(a[0].last_changed) : Infinity;
-            const _last = a.length && a[a.length - 1].statistics ? _end(a[a.length - 1]) : Infinity;
-            const out = under.filter(x => _end(x) <= _first || msOf(x.last_changed) >= _last || !cov.some(([p, q]) => msOf(x.last_changed) < q && _end(x) > p));
-            return out.length ? mergeRows(out, a) : a;
-        }, undefined);
-        let r = [];
-        for( let i = c0; i <= c1; i++ ) {
-            const a = _rows(this.cache[i]);
-            if( a ) r = r.concat(a);
-        }
-        for( let i = c0 - 1; i >= 0; i-- ) {
-            const a = _rows(this.cache[i]);
-            if( !a ) break;
-            if( a.length ) {
-                const _last = a[a.length - 1];
-                // (at its end — a week's, a month's no later than c0's start: never after the rows it precedes)
-                r.unshift({ last_changed: Math.min(msOf(_last.statistics?.end ?? _last.last_changed), msOf(this.cache[c0].start)), state: _last.state });
-                break;
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), Y = this.yScaleRange(), curves = new Map(), series = new Map();
+        let A = t0, B = t1;
+        const _widen = (id, a, b) => { const x = series.get(id); series.set(id, x ? [Math.min(x[0], a), Math.max(x[1], b)] : [a, b]); };
+        for( const g of this.graphs ) curves.set(g, g.entities.map(e => {
+            const [a, b] = this.rowsSpan(g, e);
+            A = Math.min(A, a); B = Math.max(B, b);
+            for( const k of INDIRECT_OPTIONS ) {
+                const id = optionSeriesOf(e, k);
+                if( id ) _widen(id, k === 'arrowLength' && Y ? Math.min(a, Y[0]) : a, k === 'arrowLength' && Y ? Math.max(b, Y[1]) : b);
             }
+            return [a, b];
+        }));
+        return { curves, series, all: [A, B] };
+    }
+
+    // An entity's rows from T0 to T1 (ms), with the one before T0 — when nothing between them
+    // was never asked: the value in force at T0 (no interpolation issue at the start of a
+    // curve, no state disappearing at the start of a timeline) — and the one after T1: the
+    // finest it has over the time each source holds — its history, else its 5-minute
+    // statistics, its statistics of the period… (layers: those it may be drawn from, the first
+    // preferred — see _drawLayers —; else every one, the finest first) —; in a span of a finer
+    // one, the coarser ones before its first row and after its last statistics' end (the
+    // recorder no longer keeping it there, statistics not compiled yet). What the cache has is
+    // drawn at once, however coarse, a finer layer replacing it as it comes. Empty when the
+    // cache has none. The times from T0 to T1 (until now) no source it may be drawn from was
+    // asked for: their spans [a, b] (notLoaded), gaps never drawn over
+    cachedHistory(entity, T0, T1, layers = null)
+    {
+        const _layers = layers ?? LAYERS, _end = x => msOf(x.statistics?.end ?? x.last_changed);
+        // (each layer's rows from the one before T0 to the one after T1, and where it has some:
+        // in each of its spans, from its first row there to its last one's end — the history's
+        // last one lasting to the span's end, its first from the span's start where the value in
+        // force there is known)
+        const _parts = _layers.map(l => {
+            const tr = this._track(l, entity);
+            if( !tr ) return null;
+            const i0 = Math.max(0, rowIndex(tr.rows, T0) - 1), i1 = Math.min(tr.rows.length, rowIndex(tr.rows, T1, true) + 1);
+            const rows = tr.rows.slice(i0, i1), has = [];
+            if( rows.length ) {
+                const lo = msOf(rows[0].last_changed), hi = _end(rows[rows.length - 1]);
+                for( const s of tr.spans ) {
+                    if( s.b <= lo || s.a > hi ) continue;
+                    const k0 = rowIndex(tr.rows, s.a), k1 = rowIndex(tr.rows, s.b);
+                    // (the history: from the span's start where the value in force there is known —
+                    // the row before it, nothing unknown between —, the value lasting; statistics:
+                    // their periods there)
+                    if( l === 'hist' && k0 && this._knownSince(tr, tr.rows[k0 - 1], { last_changed: s.a }) ) has.push([s.a, s.b]);
+                    else if( k1 > k0 ) has.push([msOf(tr.rows[k0].last_changed), tr.rows[k1 - 1].statistics ? _end(tr.rows[k1 - 1]) : s.b]);
+                }
+            }
+            return { rows, has, spans: tr.spans };
+        });
+        let r;
+        for( let k = _parts.length - 1; k >= 0; k-- ) {
+            const p = _parts[k];
+            if( !p ) continue;
+            if( !r?.length ) { r = p.rows; continue; }
+            const _kept = r.filter(x => !p.has.some(([f, l]) => msOf(x.last_changed) < l && _end(x) > f));
+            r = _kept.length ? mergeRows(_kept, p.rows) : p.rows;
         }
-        const out = heldRuns(withoutRepeats(r)), _now = Date.now(), _spans = [];
-        for( let i = c0; i <= c1; i++ ) {
-            const s = this.cache[i];
-            if( s.a >= _now || _layers.some(l => s.cover[l].get(entity)?.length) ) continue;
-            const _last = _spans[_spans.length - 1], b = Math.min(s.b, _now);
-            if( _last && _last[1] === s.a ) _last[1] = b; else _spans.push([s.a, b]);
-        }
-        out.notLoaded = _spans;
+        const all = heldRuns(withoutRepeats(r ?? []));
+        // (the time asked of any of the layers)
+        const _seen = rangesOf(_parts.flatMap(p => p?.spans ?? []).sort((p, q) => p.a - q.a));
+        let i0 = rowIndex(all, T0), i1 = rowIndex(all, T1, true);
+        if( i0 > 0 && !outside(msOf(all[i0 - 1].last_changed), T0, _seen).length ) i0--;
+        if( i1 < all.length ) i1++;
+        const out = all.slice(i0, i1);
+        out.notLoaded = outside(T0, Math.min(T1, this.askNow()), _seen);
         return out;
     }
 
@@ -434,8 +565,7 @@ export class CardHistory
     generateGraphDataFromCache(cause, only = null, offscreenToo = false)
     {
         const _t = performance.now();
-        let c0 = this.mapStartTimeToCacheSlot(this.startTime);
-        let c1 = this.mapEndTimeToCacheSlot(this.endTime);
+        const t1 = msOf(this.endTime);
         // (what waited to be drawn again — see _drawSoon —: drawn now)
         if( !only || only === this._dirty ) this._dirty = undefined;
         this._lastDrawAt = performance.now();
@@ -452,15 +582,18 @@ export class CardHistory
         }
         if( _graphs && !_graphs.length ) return;
 
-        if( c0 >= 0 && c1 >= 0 ) {
+        // (a window the cache holds some of: after its start)
+        if( this._cacheReady() && t1 > this.cache.from ) {
             const result = [];
-            // (each from the layers its ladder allows: see _drawLayers — a graph not drawn
-            // again: nothing worked out, its place kept)
+            // (each from the layers its ladder allows: see _drawLayers — over the time its
+            // points are worked out from, rowsSpan —; a graph not drawn again: nothing worked
+            // out, its place kept)
             const _tc = performance.now();
             const _layers = this._drawLayers(this._statisticsIds());
-            for( const g of this.graphs ) for( const e of g.entities ) result.push(!_graphs || _graphs.includes(g) ? this.cachedHistory(e.entity, c0, c1, _layers.get(e.entity)) : null);
+            const R = this.readSpans();
+            for( const g of this.graphs ) g.entities.forEach((e, j) => result.push(!_graphs || _graphs.includes(g) ? this.cachedHistory(e.entity, ...R.curves.get(g)[j], _layers.get(e.entity)) : null));
             const colorHistory = {};
-            for( const id of this.optionSeriesIds() ) colorHistory[id] = this.cachedHistory(id, c0, c1, _layers.get(id));
+            for( const [id, span] of R.series ) colorHistory[id] = this.cachedHistory(id, ...span, _layers.get(id));
             // (timed while the performance test records: the rows read from the cache)
             perf.add('from cache', performance.now() - _tc);
             this.buildChartData(result, colorHistory, _graphs);
@@ -609,17 +742,17 @@ export class CardHistory
         return d >= 30 ? { months: n } : { days: n * d };
     }
 
-    // Blocks of a size (_blockOf) over A to B (ms) widened to whole hours (whole days for
-    // blocks of days or months, at local midnight) → [[a, b]], from B — fromLeft: from A
+    // Blocks of a size (_blockOf) over A to B (ms) widened to whole hours (whole UTC days for
+    // blocks of days, of 30 days for blocks of months) → [[a, b]], from B — fromLeft: from A
     _blocks(A, B, size, fromLeft = false)
     {
-        const _unit = size.hours ? 'hour' : size.days ? 'day' : 'month', _n = size.hours ?? size.days ?? size.months;
-        const A0 = alignDown(A, !size.hours), B0 = alignUp(B, !size.hours), out = [];
+        const _unit = size.hours ? HOUR_MS : size.days ? DAY_MS : PERIOD_MS[MONTH_PERIOD], _step = ( size.hours ?? size.days ?? size.months ) * _unit;
+        const A0 = gridDown(A, _unit), B0 = gridUp(B, _unit), out = [];
         // (blocks of the width — up to a day —: the width rounded out to whole hours, one block)
         if( size.hours && B0 - A0 <= ( size.hours + 1 ) * HOUR_MS ) return B0 > A0 ? [[A0, B0]] : out;
         // (a bound for safety: 10 years of a window's blocks)
-        if( fromLeft ) for( let a = A0; a < B0 && out.length < 5000; ) { const b = moment(a).add(_n, _unit).valueOf(); out.push([a, Math.min(b, B0)]); a = b; }
-        else for( let b = B0; b > A0 && out.length < 5000; ) { const a = moment(b).subtract(_n, _unit).valueOf(); out.push([Math.max(a, A0), b]); b = a; }
+        if( fromLeft ) for( let a = A0; a < B0 && out.length < 5000; a += _step ) out.push([a, Math.min(a + _step, B0)]);
+        else for( let b = B0; b > A0 && out.length < 5000; b -= _step ) out.push([Math.max(b - _step, A0), b]);
         return out;
     }
 
@@ -630,24 +763,16 @@ export class CardHistory
         return Math.min(r, PERIOD_MS[MONTH_PERIOD]);
     }
 
-    // The slot holding time t (ms): its index — the first's, the last's beyond the cache
-    _slotAt(t)
-    {
-        let lo = 0, hi = this.cache.length - 1;
-        while( lo < hi ) { const m = ( lo + hi + 1 ) >> 1; if( this.cache[m].a <= t ) lo = m; else hi = m - 1; }
-        return lo;
-    }
-
-    // The parts of A to B (ms; until now) entity id's layer lacks — not in the cache, nor asked
-    // (flying: false, asked or not); the history never before where Home Assistant was seen
-    // to keep none (_histFrom)
+    // The parts of A to B (ms; until now) entity id's layer lacks — no known span holds, nor
+    // asked (flying: false, asked or not); never before the cache's start, the history never
+    // before where Home Assistant was seen to keep none (_histFrom)
     _lacking(layer, id, A, B, flying = true)
     {
-        if( !this.cache.length ) return [];
-        A = Math.max(A, this.cache[0].a, layer === 'hist' ? this._histFrom?.get(id) ?? -Infinity : -Infinity); B = Math.min(B, Date.now());
+        if( !this._cacheReady() ) return [];
+        A = Math.max(A, this.cache.from, layer === 'hist' ? this._histFrom?.get(id) ?? -Infinity : -Infinity); B = Math.min(B, this.askNow());
         if( B <= A ) return [];
         const cov = flying ? [...( this._flying?.get(layer + ' ' + id) ?? [] )] : [];
-        for( let i = this._slotAt(A), i1 = this._slotAt(B - 1); i <= i1; i++ ) for( const x of this.cache[i].cover[layer].get(id) ?? [] ) cov.push(x);
+        appendAll(cov, rangesOf(this._track(layer, id)?.spans ?? [], known));
         return outside(A, B, cov);
     }
 
@@ -668,26 +793,36 @@ export class CardHistory
         if( this._lacking(layer, id, a, b, false).length ) return null;
         // (the history known just before a, without a break: it doesn't begin at a — its
         // state at a, the one in force, not kept, see _mergeLayer)
+        const rows = this._track(layer, id)?.rows ?? [];
         if( layer === 'hist' ) {
-            const s = this.cache[this._slotAt(a)], r = ( s.cover.hist.get(id) ?? [] ).find(([p, q]) => p < a && a <= q);
-            if( r && ( s.hist.get(id) ?? [] ).some(row => { const t = msOf(row.last_changed); return t >= r[0] && t < a; }) ) return a;
+            const r = rangesOf(this._track(layer, id)?.spans ?? [], known).find(([p, q]) => p < a && a <= q), k = r ? rowIndex(rows, r[0]) : rows.length;
+            if( k < rows.length && msOf(rows[k].last_changed) < a ) return a;
         }
-        b = Math.min(b, Date.now());
-        for( let i = this._slotAt(a), i1 = this._slotAt(b - 1); i <= i1; i++ ) for( const row of this.cache[i][layer].get(id) ?? [] ) {
-            const t = msOf(row.last_changed);
-            if( t >= a && t < b ) return t;
-        }
-        return b;
+        b = Math.min(b, this.askNow());
+        const k = rowIndex(rows, a);
+        return k < rows.length && msOf(rows[k].last_changed) < b ? msOf(rows[k].last_changed) : b;
     }
 
-    // (a request of a kind widened to whole days — the statistics of the hourly family: their
-    // periods whole —, else from where it lacks — a refresh asks only what came since —, until
-    // the end of the hour when it reaches now: what comes later asked by a refresh, see
-    // _forgetToday — never the last seconds again at each answer)
+    // (a request of a kind: statistics whole periods of theirs — Home Assistant gives a period
+    // by its start, a day, a week, a month asked in part made of that part —, the history from
+    // where it lacks — a refresh asks only what came since —, until the end of the hour when it
+    // reaches now: what comes later asked by a refresh, see _forgetToday — never the last
+    // seconds again at each answer)
     _span(kind, a, b)
     {
-        if( kind !== 'history' && periodMs(periodOfKind(kind, this.statistics.period)) >= HOUR_MS ) return [alignDown(a, true), alignUp(b, true)];
-        return [a, b >= Date.now() - 1000 ? alignUp(b, false) : b];
+        if( kind !== 'history' ) return this._periodsOver(periodOfKind(kind, this.statistics.period), a, b);
+        return [a, b >= this.askNow() - 1000 ? gridUp(b, HOUR_MS) : b];
+    }
+
+    // The whole periods of statistics of a period ('5minute', 'hour', 'day', 'week', 'month')
+    // over a to b (ms) — 5 minutes and hours on UTC's grid, days, weeks and months on Home
+    // Assistant's calendar (haCalendar) —: [start of the first, end of the last]
+    _periodsOver(name, a, b)
+    {
+        const u = CALENDAR_UNITS[name];
+        if( !u ) { const P = periodMs(name); return [gridDown(a, P), gridUp(b, P)]; }
+        const cal = haCalendar(this._hass?.config?.time_zone), e = cal.start(b, u);
+        return [cal.start(a, u), e < b ? cal.add(e, 1, u) : e];
     }
 
     // Entity id's source kind (an entity's attributes: together, see _histUnits) asked from A
@@ -743,7 +878,7 @@ export class CardHistory
     // may bring the same hours later)
     _speaks(rows, t, gap)
     {
-        const _now = Date.now();
+        const _now = this.askNow();
         let n = 0, short = 0, shortest = null, prev = null;
         for( const x of rows ?? [] ) {
             const v = x.lu * 1000;
@@ -771,7 +906,7 @@ export class CardHistory
     {
         const _fresh = ids.filter(id => !PROBES.has(id));
         if( _fresh.length ) {
-            const _now = Date.now();
+            const _now = this.askNow();
             const _valid = l => l.forEach(id => SENSOR_GAPS.set(id, { fine: true, hour: true }));
             // (kept on this device only when told by the history — Home Assistant failing: every
             // statistics valid for this page only)
@@ -850,62 +985,71 @@ export class CardHistory
         return [...out.values()];
     }
 
-    // Rows put in slot i's layer for entity id from a to b (ms): in place of those there
-    // between them (and of those of the same time) — the history's first, the state at a
-    // given with it, a boundary (b), dropped where the hours before it are covered too and the
-    // row before it gives the same (see withoutRepeats), or is a state Home Assistant gave the
-    // card (live: newer than what its database had written) —, the time covered (cover)
-    // joined. The history's: with the states the card was given between a and b it doesn't
-    // have yet — not written yet: kept (see addLiveState)
-    _mergeLayer(layer, i, id, rows, a, b)
+    // An answer's rows put in entity id's track of a layer, from a to b (ms), asked at `at`,
+    // final until upto, as of what Home Assistant had compiled then (proof — see _answered;
+    // none: at):
+    // at each time, what's known as of the latest time stays — the answer put only where no
+    // span is known as of a later time (answers coming in any order), there in place of the
+    // rows (and of those of the same time), the span known as of `at`. The history's: with the
+    // states the card was given there (live) the answer doesn't have yet — not written yet:
+    // kept (see addLiveState) —; its first row, the state at a given with it, a boundary (b),
+    // dropped where the time before it is known and the row before it gives the same (see
+    // withoutRepeats) — so is the first row after a part put when it's such a boundary —, and
+    // a state given the same as the row before it (no change: an attribute's time is its
+    // entity's last update, whatever changed)
+    _mergeLayer(layer, id, rows, a, b, at, upto = at, proof = upto)
     {
-        const s = this.cache[i], old = s[layer].get(id) ?? [], _hist = layer === 'hist';
-        const _given = _hist ? mergeRows(old.filter(x => x.live && msOf(x.last_changed) >= a && msOf(x.last_changed) < b), this._takeLive(id, a, b)).filter(x => !rows.some(y => _sameTime(y, x))) : [];
-        const _add = _hist ? mergeRows(rows.map((x, k) => !k && msOf(x.last_changed) <= a ? { ...x, b: true } : x), _given) : rows;
-        const cov = addRange(s.cover[layer].get(id) ?? [], a, b), _new = new Set(_add.map(x => msOf(x.last_changed)));
-        const _keep = old.filter(x => { const t = msOf(x.last_changed); return ( t < a || t >= b ) && !_new.has(t); });
-        const out = mergeRows(_keep, _add);
-        const _before = k => k ? out[k - 1] : this._lastRowBefore(layer, id, i) ?? ( this._live?.get(id) ?? [] ).filter(x => x.last_changed < a).pop();
-        // (a state given the same as the row before it: no change — an attribute's time is its
-        // entity's last update, whatever changed)
-        s[layer].set(id, _hist ? out.filter((x, k) => {
-            if( x.live ) { const r = _before(k); return !r || !_sameValue(r.state, x.state); }
-            if( !x.b || !cov.some(([p, q]) => p < msOf(x.last_changed) && msOf(x.last_changed) <= q) ) return true;
-            const r = _before(k); return !r || !r.live && !_repeats(r, x); }) : out);
-        s.cover[layer].set(id, cov);
-        // (the next day loaded before this one: its first row, the state in force at its start
-        // given with it (b), dropped now that the row before it is known — this day covered to
-        // its end — and gives the same)
-        const n = _hist ? this.cache[i + 1] : null, _next = n?.hist.get(id), _last = s.hist.get(id)?.at(-1);
-        if( _next?.[0]?.b && _last && !_last.live && cov.some(([p, q]) => q >= s.b) && _repeats(_last, _next[0]) ) n.hist.set(id, _next.slice(1));
+        const tr = this._track(layer, id, true), _hist = layer === 'hist';
+        if( _hist ) rows = rows.map((x, k) => !k && msOf(x.last_changed) <= a ? { ...x, b: true } : x);
+        for( const [p, q] of outside(a, b, tr.spans.filter(s => s.at > at).map(s => [s.a, s.b])) )
+            this._putRows(tr, _hist, rows.filter(x => { const t = msOf(x.last_changed); return t >= p && t < q || x.b && p === a; }), p, q, at, upto, proof);
+    }
+
+    // (an answer's rows from a to b — where it's the newest — put in track tr: see _mergeLayer)
+    _putRows(tr, _hist, rows, a, b, at, upto, proof)
+    {
+        const old = tr.rows, i0 = rowIndex(old, a), i1 = rowIndex(old, b), _new = new Set(rows.map(x => msOf(x.last_changed)));
+        const _given = _hist ? old.slice(i0, i1).filter(x => x.live && !rows.some(y => _sameTime(y, x))) : [];
+        const _add = _hist ? mergeRows(rows, _given) : rows;
+        const out = mergeRows(old.filter((x, k) => ( k < i0 || k >= i1 ) && !_new.has(msOf(x.last_changed))), _add);
+        tr.spans = setSpan(tr.spans, a, b, { at, upto, proof });
+        if( !_hist ) { tr.rows = out; return; }
+        // (from the part's first row — a, or its boundary before — to the first row after b: a
+        // state given the same as the row before it, no change; a request's start where all the
+        // time from the row before it is known — see _knownSince —: the same, nothing; another,
+        // a change there — nothing could hide between them —, a value recorded)
+        const j0 = rowIndex(out, Math.min(a, _add.length ? msOf(_add[0].last_changed) : a)), j1 = Math.min(out.length, rowIndex(out, b, true) + 1), _kept = [];
+        out.forEach((x, k) => {
+            if( k < j0 || k >= j1 ) return void _kept.push(x);
+            const p = k ? out[k - 1] : null;
+            if( x.live ) { if( !p || !_sameValue(p.state, x.state) ) _kept.push(x); return; }
+            if( !x.b || !p || p.live || !this._knownSince(tr, p, x) ) return void _kept.push(x);
+            if( !_repeats(p, x) ) { const { b: _b, ...y } = x; _kept.push(y); }
+        });
+        tr.rows = _kept;
+    }
+
+    // (track tr known — every change — from row p to row x: their time within a known span, up
+    // to where it's sure — see the cache)
+    _knownSince(tr, p, x)
+    {
+        const t0 = msOf(p.last_changed), t1 = msOf(x.last_changed);
+        return !outside(t0, t1 + 1, rangesOf(tr.spans.filter(known).map(s => ({ a: s.a, b: Math.min(s.b, Math.max(s.upto ?? s.at, s.a)) })).filter(s => s.b > s.a))).length;
     }
 
     // A state of series id Home Assistant gave the card — pushed, or the one it had when the
     // card looked —, at its time (last_changed): a row of its history (live), known before its
     // recorder writes it (every commit_interval) — an answer of the history without it tells
-    // only that it isn't written yet: kept, until one has it (_mergeLayer). In the cache at
-    // once where its day's history is there; else put there with it when it comes
+    // only that it isn't written yet: kept, until one has it (_mergeLayer). None where the
+    // history has a row of that time, or the row before it gives the same (no change)
     addLiveState(id, lastChanged, state)
     {
-        const row = { last_changed: msOf(lastChanged), state, live: true };
-        const i = this.cache.length && row.last_changed >= this.cache[0].a ? this._slotAt(row.last_changed) : -1, s = this.cache[i], _rows = s?.hist.get(id);
-        if( _rows ) {
-            // (the same as the state in force then: no change, no row — see _mergeLayer)
-            const _prev = _rows.filter(x => msOf(x.last_changed) < row.last_changed).pop() ?? this._lastRowBefore('hist', id, i);
-            if( !_rows.some(x => _sameTime(x, row)) && !( _prev && _sameValue(_prev.state, row.state) ) ) s.hist.set(id, mergeRows(_rows, [row]));
-            return;
-        }
-        const l = ( this._live ??= new Map() ).get(id) ?? [];
-        if( !l.some(x => _sameTime(x, row)) ) this._live.set(id, mergeRows(l, [row]));
-    }
-
-    // The states of series id given to the card from a to b (ms) while their day's history
-    // wasn't there (addLiveState), taken out to be put there
-    _takeLive(id, a, b)
-    {
-        const l = this._live?.get(id) ?? [], _in = x => x.last_changed >= a && x.last_changed < b;
-        if( l.some(_in) ) this._live.set(id, l.filter(x => !_in(x)));
-        return l.filter(_in);
+        if( !this._cacheReady() ) this.initCache();
+        const tr = this._track('hist', id, true), row = { last_changed: msOf(lastChanged), state, live: true }, k = rowIndex(tr.rows, row.last_changed);
+        if( k < tr.rows.length && _sameTime(tr.rows[k], row) || k > 0 && _sameTime(tr.rows[k - 1], row) ) return;
+        if( k > 0 && _sameValue(tr.rows[k - 1].state, row.state) ) return;
+        tr.rows.splice(k, 0, row);
+        this._checkCache('live');
     }
 
     // The values of series id's history the cache knows, in order — every one recorded, or
@@ -915,16 +1059,12 @@ export class CardHistory
     // addLiveState) }
     knownHistory(id)
     {
-        // (the times known, joined across the days)
-        const cov = [];
-        for( const s of this.cache ) for( const [p, q] of s.cover.hist.get(id) ?? [] ) {
-            const l = cov[cov.length - 1];
-            if( l && p <= l[1] ) l[1] = Math.max(l[1], q); else cov.push([p, q]);
-        }
-        const _known = cov.length ? cov[cov.length - 1][1] : -Infinity;
+        const tr = this._cacheReady() ? this._track('hist', id) : null;
+        if( !tr ) return [];
+        const cov = rangesOf(tr.spans, known), _known = cov.length ? cov[cov.length - 1][1] : -Infinity;
         const out = [];
         let c = 0, prev = null;
-        for( const s of this.cache ) for( const x of s.hist.get(id) ?? [] ) {
+        for( const x of tr.rows ) {
             if( x.b ) continue;
             const t = msOf(x.last_changed);
             if( prev !== null ) while( c < cov.length && cov[c][1] < prev ) c++;
@@ -935,44 +1075,25 @@ export class CardHistory
         return out;
     }
 
-    // Is entity id's history from a to b (ms) in the cache, all of it, without a number — no
-    // state in force then that is one (unavailable, unknown…)?
-    _withoutNumber(id, a, b)
+    // Entity id's last row of a layer before time t (ms), when everything from it to t was
+    // asked — the value in force at t —; null for none
+    _rowBefore(layer, id, t)
     {
-        if( this._lacking('hist', id, a, b, false).length ) return false;
-        const i = this._slotAt(a), _rows = this.cache.slice(i, this._slotAt(b - 1) + 1).flatMap(s => s.hist.get(id) ?? []);
-        const _start = _rows.filter(x => msOf(x.last_changed) <= a).pop() ?? this._lastRowBefore('hist', id, i);
-        return [_start, ..._rows.filter(x => msOf(x.last_changed) > a && msOf(x.last_changed) < b)].every(x => !x || x.state === '' || x.state === null || isNaN(Number(x.state)));
-    }
-
-    // The last row of entity id's layer before slot i, from the slots before it as far back as
-    // they're loaded; null for none
-    _lastRowBefore(layer, id, i)
-    {
-        for( let j = i - 1; j >= 0; j-- ) {
-            const a = this.cache[j][layer].get(id);
-            if( !a ) return null;
-            if( a.length ) return a[a.length - 1];
-        }
-        return null;
-    }
-
-    // The slots from t0 to t1 (ms; until now, from the cache's first): [first, last]
-    _slotsOf(t0, t1)
-    {
-        return [this.mapStartTimeToCacheSlot(Math.max(t0, this.cache[0].start_m.valueOf())), this.mapEndTimeToCacheSlot(Math.min(t1, Date.now()))];
+        const tr = this._track(layer, id), k = tr ? rowIndex(tr.rows, t) : 0;
+        if( !k ) return null;
+        const x = tr.rows[k - 1];
+        return outside(msOf(x.last_changed), t, rangesOf(tr.spans)).length ? null : x;
     }
 
     // Where entity id's statistics of a layer stop, over the last two days: the end of their
-    // last row there — the start of those days, loaded without any; null: not loaded there
+    // last row since then — where they were asked since then, without any; null: not asked then
     _statsEnd(layer, id)
     {
-        let end = null;
-        for( let i = Math.max(0, this.cache.length - 2); i < this.cache.length; i++ ) {
-            const a = this.cache[i][layer].get(id);
-            if( a ) end = a.length ? msOf(a[a.length - 1].statistics.end) : end ?? this.cache[i].a;
-        }
-        return end;
+        const tr = this._track(layer, id), Z = this.askNow() - 2 * DAY_MS;
+        if( !tr ) return null;
+        if( rowIndex(tr.rows, Z) < tr.rows.length ) return msOf(tr.rows[tr.rows.length - 1].statistics.end);
+        const s = tr.spans.find(x => x.b > Z);
+        return s ? Math.max(Z, s.a) : null;
     }
 
     // What the window lacks asked (BRANCH.md), each entity by its plan (_planOf), sent by
@@ -991,18 +1112,18 @@ export class CardHistory
     // Nothing is asked twice: what the cache has, or a request under way will bring
     _askMissing()
     {
-        // Prime the cache on first call; a slot for each day begun since
-        if( !this.cache.length ) this.initCache();
-        this._extendToNow();
+        // (the cache made on the first call)
+        if( !this._cacheReady() ) this.initCache();
 
-        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _now = Date.now(), G = this._geometry(), r = G.r;
+        // (how far Home Assistant may have values: see askNow)
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _now = this.askNow(), G = this._geometry(), r = G.r;
         // (a new window, or new curves: the background no sooner than AHEAD_GAP_MS after it — a gesture going on)
         const _key = [this.startTime, this.endTime, ...this.historyEntityIds()].join();
-        if( _key !== this._aheadKey ) { this._aheadKey = _key; this._backgroundNext = Math.max(this._backgroundNext ?? 0, _now + AHEAD_GAP_MS); }
+        if( _key !== this._aheadKey ) { this._aheadKey = _key; this._backgroundNext = Math.max(this._backgroundNext ?? 0, steadyNow() + AHEAD_GAP_MS); }
 
         // (the cache grown, a year at a time, as far as the background fills it: HORIZON
         // windows before the window — 10 years at most, see growCache)
-        while( t0 - HORIZON * r < this.cache[0].a && this.cacheSize < CACHE_MAX_DAYS ) this.growCache(YEAR_DAYS);
+        while( t0 - HORIZON * r < this.cache.from && this.cacheSize < CACHE_MAX_DAYS ) this._growCache(YEAR_DAYS);
 
         const _ids = this.historyEntityIds();
         if( !_ids.length || r <= 0 ) return;
@@ -1042,7 +1163,7 @@ export class CardHistory
             if( !p1 ) continue;
             const _lack = this._lacking(LAYER[p1.kind], u[0], t0 - _side, t1 + _side);
             // (a first load: nothing of it there, nor asked)
-            const _first = _lack.length === 1 && _lack[0][0] <= Math.max(t0 - _side, this.cache[0].a) && _lack[0][1] >= Math.min(t1 + _side, _now);
+            const _first = _lack.length === 1 && _lack[0][0] <= Math.max(t0 - _side, this.cache.from) && _lack[0][1] >= Math.min(t1 + _side, _now);
             for( const [a, b] of _lack )
                 _part(p1.kind, a, b, u[0], this._inWindow(a, b) ? 1 : PHASE_SIDES, _first);
             for( let k = fam.indexOf(p1); k > 0; k-- ) {
@@ -1064,7 +1185,9 @@ export class CardHistory
         const _bySource = new Map();
         for( const p of plans.values() ) if( p.p2 ) { if( !_bySource.has(p.p2.kind) ) _bySource.set(p.p2.kind, []); _bySource.get(p.p2.kind).push(p); }
         const _series = (kind, l) => l.flatMap(p => kind === 'history' ? p.u : [p.u[0]]);
-        this._blocks(t0, Math.min(t1, _now), _size).forEach(([a, b], k) => {
+        // (over what the window reads: its curves' groups at its edges — see readSpans)
+        const [R0, R1] = this.readSpans().all;
+        this._blocks(R0, Math.min(R1, _now), _size).forEach(([a, b], k) => {
             for( const [kind, l] of _bySource ) for( const g of this._requestGroups(l.map(p => [p])) ) {
                 this._askGroup(kind, _series(kind, g), a, b, { phase: 2, rank: k });
                 const _empty = new Map(), _add = (f, ids) => { if( !_empty.has(f) ) _empty.set(f, []); appendAll(_empty.get(f), ids); };
@@ -1093,7 +1216,7 @@ export class CardHistory
         for( const { u, fam, p1, p2 } of plans.values() ) {
             const f = p2 ? ( p2.kind === 'history' ? null : p2 ) : p1 ? fam[0] : null;
             if( !f ) continue;
-            const _from = alignDown(Math.max(t0, Math.min(_now - f.ms - STATS_LAG, this._statsEnd(LAYER[f.kind], u[0]) ?? Infinity)), false);
+            const _from = gridDown(Math.max(t0, Math.min(_now - f.ms - STATS_LAG, this._statsEnd(LAYER[f.kind], u[0]) ?? Infinity)), HOUR_MS);
             if( _from >= t1 ) continue;
             const _k = _from + ' ' + ( p2 ? 2 : 1 );
             if( !_after.has(_k) ) _after.set(_k, { from: _from, phase: p2 ? 2 : 1, ids: [] });
@@ -1118,7 +1241,7 @@ export class CardHistory
     _background(plans, t0, t1, G, side, size)
     {
         if( !this._backgroundFree() ) return;
-        const _now = Date.now(), r = G.r;
+        const _now = this.askNow(), r = G.r;
         // (the first block some of ids lack: { a, b }, null for none)
         const _first = (kind, ids, blocks) => { for( const [a, b] of blocks ) if( ids.some(id => this._lacking(LAYER[kind], id, a, b).length) ) return { a, b }; return null; };
         const _angles = new Set(this._angleIds([...plans.values()].filter(p => p.fam.length).map(p => p.u[0])));
@@ -1142,38 +1265,53 @@ export class CardHistory
         }
     }
 
-    // The cache kept under CACHE_MAX_ROWS rows: past it, the least useful rows purged until
-    // it's back under AHEAD_MAX_ROWS (see CACHE_MAX_ROWS) — a day purged is asked again when
-    // it's needed, drawn meanwhile from the coarser statistics kept —, never in the window nor
-    // its sides (_sideOf): a long window may keep it past CACHE_MAX_ROWS
+    // The cache kept under CACHE_MAX_ROWS rows: past it, the least useful purged until it's
+    // back under AHEAD_MAX_ROWS (see CACHE_MAX_ROWS) — the rows farthest from the window first,
+    // layer by layer from the finest (the biggest), their spans cut where they are: asked again
+    // when they're needed, drawn meanwhile from the coarser statistics kept —, never in the
+    // window nor its sides (_sideOf): a long window may keep it past CACHE_MAX_ROWS
     _purge()
     {
         let n = this.cacheRows();
         if( n <= CACHE_MAX_ROWS ) return;
-        // (never the window and its sides: the zone phase 1 asks — _sideOf)
-        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), side = this._sideOf(t1 - t0);
-        const [k0, k1] = this._slotsOf(t0 - side, t1 + side);
-        if( k0 < 0 || k1 < 0 ) return;
-        const _far = [];
-        for( let i = 0; i < this.cache.length; i++ ) if( i < k0 || i > k1 ) _far.push(i);
-        _far.sort((a, b) => Math.max(k0 - b, b - k1) - Math.max(k0 - a, a - k1));
-        // (the layers from the finest — the biggest)
-        for( const l of LAYERS ) for( const i of _far ) {
-            const s = this.cache[i];
-            for( const [id, a] of s[l] ) {
-                n -= a.length;
-                s[l].delete(id); s.askedAt[l].delete(id); s.cover[l].delete(id);
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), side = this._sideOf(t1 - t0), Z0 = t0 - side, Z1 = t1 + side;
+        const _far = t => t < Z0 ? Z0 - t : t > Z1 ? t - Z1 : 0;
+        for( const l of LAYERS ) {
+            // (how far the rows outside the zone are: the farthest kept no farther than D — those
+            // needed gone, a few more of the same distance)
+            const _d = [];
+            for( const tr of this.cache.layers[l].values() ) for( const x of tr.rows ) { const d = _far(msOf(x.last_changed)); if( d > 0 ) _d.push(d); }
+            if( !_d.length ) continue;
+            _d.sort((x, y) => y - x);
+            // (kept: from A to B — the rows there, every span cut there; a row's time may hold a
+            // fraction of a ms, the history's —, a row more for each series of the history: the
+            // state in force where it's cut, kept)
+            const D = _d[Math.min(n - AHEAD_MAX_ROWS + ( l === 'hist' ? this.cache.layers[l].size : 0 ), _d.length) - 1], A = Z0 - D + 1, B = Z1 + D;
+            for( const tr of this.cache.layers[l].values() ) {
+                const k0 = rowIndex(tr.rows, A), k1 = rowIndex(tr.rows, B);
+                if( k0 === 0 && k1 === tr.rows.length ) continue;
+                const rows = tr.rows.slice(k0, k1), _prev = k0 ? tr.rows[k0 - 1] : null;
+                // (the history: its state at the start of what's kept, as a request's start gives it,
+                // where it was known from that row on)
+                // (a request's start there giving the same: moved to it)
+                if( l === 'hist' && _prev && !outside(msOf(_prev.last_changed), A, rangesOf(tr.spans)).length && !( rows.length && msOf(rows[0].last_changed) === A ) ) {
+                    if( rows[0]?.b && _repeats(_prev, rows[0]) ) rows[0] = { ...rows[0], last_changed: A };
+                    else rows.unshift({ last_changed: A, state: _prev.state, b: true });
+                }
+                n -= tr.rows.length - rows.length;
+                tr.rows = rows;
+                tr.spans = tr.spans.map(s => ({ ...s, a: Math.max(s.a, A), b: Math.min(s.b, B) })).filter(s => s.b > s.a);
             }
-            if( n <= AHEAD_MAX_ROWS ) { this._cacheVersion = this.cacheVersion() + 1; return; }
+            this._cacheVersion = this.cacheVersion() + 1;
+            if( n <= AHEAD_MAX_ROWS ) return;
         }
-        this._cacheVersion = this.cacheVersion() + 1;
     }
 
     // May a request be made in the background now — nothing under way, no gesture going on,
     // the pause after the last one over? If not, the cache is looked at again once it is
     _backgroundFree()
     {
-        const _wait = ( this._backgroundNext ?? 0 ) - Date.now();
+        const _wait = ( this._backgroundNext ?? 0 ) - steadyNow();
         if( !this._requests.length && !haRequests.busy() && !this.state.drag && _wait <= 0 ) return true;
         clearTimeout(this._backgroundTid);
         this._backgroundTid = setTimeout(() => { this._backgroundTid = 0; if( !this._requests.length ) this._askMissing(); }, Math.min(AHEAD_GAP_MAX_MS, Math.max(_wait, AHEAD_GAP_MS)));
@@ -1223,7 +1361,7 @@ export class CardHistory
             return Promise.all([_states.length ? this._askHA(this.historyRequest(_states, moment(t0), moment(t1), true)) : {}, this.exportRows('history', _attrs)])
                           .then(([a, b]) => _ordered({ ...a, ...b }));
         }
-        if( !this.cache.length || !_src )
+        if( !this._cacheReady() || !_src )
             return ( source === 'history' ? this.historyCall(ids, moment(t0), moment(t1)) : this._askHA(this.statisticsRequest(ids, moment(t0), moment(t1), source)) ).then(_ordered);
         const _gen = this._loadGen;
         // (what each entity lacks over the window asked — see _askSpan —, what's under way waited for)
@@ -1238,15 +1376,13 @@ export class CardHistory
                 if( retried ) throw new Error('the history was loaded again during the export');
                 return this.exportRows(source, ids, withAttributes, true);
             }
-            const c0 = this.mapStartTimeToCacheSlot(this.startTime), c1 = this.mapEndTimeToCacheSlot(this.endTime);
             const out = {};
             for( const id of ids ) {
-                let rows = [];
-                for( let i = c0; i <= c1; i++ ) appendAll(rows, this.cache[i][_src.layer].get(id) ?? []);
+                const _all = this._track(_src.layer, id)?.rows ?? [];
+                let rows = _all.slice(rowIndex(_all, t0), rowIndex(_all, t1));
                 if( source === 'history' ) {
-                    // (the last row before the window's days — the state in force at their start —,
-                    // from the days before, as far back as they're loaded: see cachedHistory)
-                    const _prev = this._lastRowBefore('hist', id, c0);
+                    // (the row before the window — the state in force at its start —: see _rowBefore)
+                    const _prev = this._rowBefore('hist', id, t0);
                     if( _prev ) rows.unshift(_prev);
                     rows = withoutRepeats(rows);
                     // (as Home Assistant gives it: the state in force at the start, at the start's time
@@ -1278,12 +1414,10 @@ export class CardHistory
     exportAvailability(ids)
     {
         const out = { history: 0, statistics: 0, periods: Object.fromEntries(STATS_EXPORT_PERIODS.map(p => [p.period, 0])), cached: {} };
-        if( !this.cache.length ) return out;
-        const c0 = this.mapStartTimeToCacheSlot(this.startTime), c1 = this.mapEndTimeToCacheSlot(this.endTime);
-        if( c0 < 0 || c1 < 0 ) return out;
+        if( !this._cacheReady() ) return out;
         const _stats = new Set(this._statisticsIds());
         for( const id of ids ) {
-            const a = this._availability(id, c0, c1, _stats.has(id));
+            const a = this._availability(id, _stats.has(id));
             if( a.short ) out.history++;
             // (a period counted only where exported for it: see _exportable)
             const _fine = a.short && _stats.has(id) && this._exportable(id, '5minute'), _long = ['hour', 'day', 'week', 'month'].filter(p => a.long && this._exportable(id, p));
@@ -1293,33 +1427,38 @@ export class CardHistory
         }
         for( const p of STATS_EXPORT_PERIODS.map(x => x.period) ) {
             const _src = this._exportSource(p), _with = ids.filter(id => _stats.has(id) && this._exportable(id, p));
-            out.cached[p] = !!_src && out.periods[p] > 0 && _with.every(id => { for( let i = c0; i <= c1; i++ ) if( this._missing(i, _src.layer, id) ) return false; return true; });
+            out.cached[p] = !!_src && out.periods[p] > 0 && _with.every(id => !this._lacking(_src.layer, id, msOf(this.startTime), msOf(this.endTime), false).length);
         }
         return out;
     }
 
-    // Has entity id's window (slots c0 to c1) data of the short-term family — its history, its
+    // Has entity id's window data of the short-term family — its history, its
     // 5-minute statistics (stats: it has statistics) — and of the long-term one, at least in
     // part? { short, long, shortKnown, longKnown } — has: a value within the window's time — a
     // row of the history there (not the state in force repeated, see withoutRepeats), a period
-    // of statistics beginning there: what its export holds —, not only in the days it touches;
-    // known: some layer of it loaded there
-    _availability(id, c0, c1, stats)
+    // of statistics beginning there: what its export holds —, not only around it; known: some
+    // layer of it asked there
+    _availability(id, stats)
     {
         // (a layer loaded and empty tells only when its period can end within the window: a
         // month's, empty over a day, tells nothing)
         const t0 = msOf(this.startTime), t1 = msOf(this.endTime), r = t1 - t0, _ms = { stats: periodMs(this.statistics.period), day: PERIOD_MS[DAY_PERIOD], week: PERIOD_MS[WEEK_PERIOD], month: PERIOD_MS[MONTH_PERIOD] };
         const _in = x => { const a = msOf(x.last_changed); return a >= t0 && a < t1; };
-        // (a layer's rows over the window's days, the row before them first — see exportRows)
-        const _rows = l => { const out = [];
-            const _prev = this._lastRowBefore(l, id, c0);
+        // (a layer's rows over the window, the row before it first — see exportRows)
+        const _rows = l => { const _all = this._track(l, id)?.rows ?? [], out = [];
+            const _prev = this._rowBefore(l, id, t0);
             if( _prev ) out.push(_prev);
-            for( let i = c0; i <= c1; i++ ) appendAll(out, this.cache[i][l].get(id) ?? []);
+            appendAll(out, _all.slice(rowIndex(_all, t0), rowIndex(_all, t1)));
             return withoutRepeats(out); };
+        // (a layer asked within the window, with a row lasting into it — or its period short enough)
+        const _asked = l => { const tr = this._track(l, id);
+            if( !tr?.spans.some(s => s.a < t1 && s.b > t0) ) return false;
+            const k = rowIndex(tr.rows, t1), p = k ? tr.rows[k - 1] : null;
+            return !!p && msOf(p.statistics?.end ?? p.last_changed) >= t0 || ( _ms[l] ?? 0 ) <= r; };
         const _of = layers => { let known = false, has = false;
             for( const l of layers ) {
                 if( _rows(l).some(_in) ) { has = known = true; continue; }
-                for( let i = c0; i <= c1; i++ ) { const a = this.cache[i][l].get(id); if( a && ( a.length || ( _ms[l] ?? 0 ) <= r ) ) known = true; }
+                if( _asked(l) ) known = true;
             }
             return { known, has }; };
         const _short = _of(stats ? ['hist', 'fine'] : ['hist']), _long = stats ? _of(['stats', 'day', 'week', 'month']) : { known: true, has: false };
@@ -1333,11 +1472,10 @@ export class CardHistory
     // history — on its last day; a request at a time (the background's) → whether one was asked
     _probeExports(statIds)
     {
-        const c0 = this.mapStartTimeToCacheSlot(this.startTime), c1 = this.mapEndTimeToCacheSlot(this.endTime);
-        if( c0 < 0 || c1 < 0 ) return false;
+        if( !this._cacheReady() ) return false;
         const _stats = new Set(statIds), _long = [], _fine = [], _hist = [];
         for( const id of this.historyEntityIds() ) {
-            const a = this._availability(id, c0, c1, _stats.has(id));
+            const a = this._availability(id, _stats.has(id));
             if( !a.longKnown ) _long.push(id);
             if( !a.shortKnown ) ( _stats.has(id) ? _fine : _hist ).push(id);
         }
@@ -1345,9 +1483,11 @@ export class CardHistory
         const r = msOf(this.endTime) - msOf(this.startTime), _longKind = this._sources().filter(x => !['history', 'fine'].includes(x.kind) && 2 * x.ms <= r).pop()?.kind ?? 'stats';
         // (each kind once: what came, or is coming, not asked again)
         const _lacks = (kind, a, b) => id => this._lacking(LAYER[kind], id, a, b).length > 0;
-        const L = _long.filter(_lacks(_longKind, this.cache[c0].a, this.cache[c1].b)), F = _fine.filter(_lacks('fine', this.cache[c1].a, this.cache[c1].b));
-        if( L.length ) this._ask(_longKind, this.cache[c0].a, this.cache[c1].b, L, { background: true });
-        else if( F.length ) this._ask('fine', this.cache[c1].a, this.cache[c1].b, F, { background: true });
+        // (over the window's periods; the 5-minute ones over its last day — until now)
+        const _e = Math.min(msOf(this.endTime), this.askNow()), [a0, b0] = this._span(_longKind, msOf(this.startTime), _e), [a1, b1] = this._span('fine', _e - DAY_MS, _e);
+        const L = _long.filter(_lacks(_longKind, a0, b0)), F = _fine.filter(_lacks('fine', a1, b1));
+        if( L.length ) this._ask(_longKind, a0, b0, L, { background: true });
+        else if( F.length ) this._ask('fine', a1, b1, F, { background: true });
         else if( _hist.some(id => this._lacking('hist', id, msOf(this.endTime) - HOUR_MS, msOf(this.endTime)).length) )
             this._askGroup('history', _hist, msOf(this.endTime) - HOUR_MS, msOf(this.endTime), { background: true });
         else return false;
@@ -1358,7 +1498,7 @@ export class CardHistory
     cacheRows()
     {
         let n = 0;
-        for( const s of this.cache ) for( const l of LAYERS ) for( const a of s[l].values() ) n += a.length;
+        if( this._cacheReady() ) for( const l of LAYERS ) for( const tr of this.cache.layers[l].values() ) n += tr.rows.length;
         return n;
     }
 
@@ -1390,14 +1530,16 @@ export class CardHistory
         return !q.background && q.gen === this._loadGen && this._inWindow(q.b0, q.b1);
     }
 
-    // The cache slots around the window the automatic Y axes look at (card-yscale.js): HORIZON
-    // windows on each side, until now — [first, last], or [-1, -1] for none
-    yScaleSlots()
+    // The time around the window the automatic Y axes look at (card-yscale.js): HORIZON
+    // windows on each side, from the cache's start — on a grid of the window's length: the same
+    // while the window moves within it, or time passes (what's read from it kept, see
+    // _yScaleNeighbours) — [from, to] (ms), null for none
+    yScaleRange()
     {
-        if( !this.cache.length ) return [-1, -1];
-        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), r = t1 - t0;
-        return [this.mapStartTimeToCacheSlot(Math.max(t0 - HORIZON * r, this.cache[0].start_m.valueOf())),
-                this.mapEndTimeToCacheSlot(Math.min(t1 + HORIZON * r, Date.now()))];
+        if( !this._cacheReady() ) return null;
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), r = Math.max(1, t1 - t0);
+        const a = Math.max(Math.floor(( t0 - HORIZON * r ) / r) * r, this.cache.from), b = Math.ceil(( t1 + HORIZON * r ) / r) * r;
+        return b > a ? [a, b] : null;
     }
 
     // How many answers the cache has taken: what was read from it is still up to date while
@@ -1405,15 +1547,6 @@ export class CardHistory
     cacheVersion()
     {
         return this._cacheVersion ?? 0;
-    }
-
-    // Are entity id's rows of a layer missing in slot i — never loaded, or to be asked again?
-    _missing(i, layer, id)
-    {
-        const s = this.cache[i];
-        // (its cover over the day, until now: the statistics by whole days — see _forgetToday)
-        const cov = s.cover[layer].get(id);
-        return !cov || outside(msOf(s.start), Math.min(msOf(s.end), Date.now()), cov).length > 0;
     }
 
     // A request to Home Assistant for entities ids from a to b (ms) — kind 'history', 'fine'
@@ -1424,10 +1557,16 @@ export class CardHistory
     // Sent by phase, then by rank, then those of the graphs on the screen first, in the graphs' order — a window no longer shown's
     // after (see ha-requests.js). The answer put in the
     // cache, what's still lacking asked, the graphs drawn again → a promise of its error,
-    // null for none (an export waits for it)
+    // null for none (an export waits for it). Its time whole seconds — as Home Assistant is
+    // asked (historyRequest, statisticsRequest): its start the second it's in, its end the
+    // next one — the span its answer holds, exactly
     _ask(kind, a, b, ids, o = {})
     {
-        const q = { kind, ids: new Set(ids), b0: a, b1: b, gen: this._loadGen, at: Date.now(), background: !!o.background, phase: o.phase, key: this._aheadKey };
+        a = Math.floor(a / 1000) * 1000; b = Math.ceil(b / 1000) * 1000;
+        // (at: Home Assistant's now when it's sent, at least — see _haNow; compiled: how far it
+        // was seen to have compiled the statistics it's made of, then — see _answered)
+        const _compiledNow = () => kind === 'history' ? null : HA_KNOWN.compiled.get(compiledOf(periodOfKind(kind, this.statistics.period))) ?? null;
+        const q = { kind, ids: new Set(ids), b0: a, b1: b, gen: this._loadGen, at: this._haNow(), sent: steadyNow(), background: !!o.background, phase: o.phase, key: this._aheadKey, compiled: _compiledNow() };
         this._requests.push(q);
         // (what it will bring, by layer and entity: see _lacking)
         this._flying ??= new Map();
@@ -1439,7 +1578,9 @@ export class CardHistory
             const _at = minOf(ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 499 : Math.min(k, 499); }));
             const _s = this.shownSeries(), _off = ids.some(id => _s.has(id)) ? 0 : 500;
             const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _off + _at, stale: () => !this._serves(q),
-                         info: { phase: o.phase ?? null, background: q.background } };
+                         info: { phase: o.phase ?? null, background: q.background },
+                         // (sent: what it's known as of, and what was seen compiled, then)
+                         sent: () => { q.at = this._haNow(); q.sent = steadyNow(); q.compiled = _compiledNow(); } };
             _p = kind === 'history' ? this.historyCall(ids, moment(a), moment(b), _o)
                                     : this._askHA(this.statisticsRequest(ids, moment(a), moment(b), periodOfKind(kind, this.statistics.period)), _o);
         } catch( e ) {
@@ -1461,16 +1602,17 @@ export class CardHistory
             if( k >= 0 ) l.splice(k, 1);
         }
         // (a request in the background: the next one no sooner than twice what it took)
-        if( q.background ) this._backgroundNext = Date.now() + Math.min(AHEAD_GAP_MAX_MS, Math.max(AHEAD_GAP_MS, 2 * ( Date.now() - q.at )));
+        if( q.background ) this._backgroundNext = steadyNow() + Math.min(AHEAD_GAP_MAX_MS, Math.max(AHEAD_GAP_MS, 2 * ( steadyNow() - q.sent )));
         try {
             // (an answer for a cache since cleared — reloadHistory —: ignored)
-            if( q.gen !== this._loadGen || !this.cache.length ) return;
+            if( q.gen !== this._loadGen || !this._cacheReady() ) return;
             if( error ) console.error('history-explorer-card: history request failed', error);
             const _t = performance.now();
             if( this.databaseCallback ) this.databaseCallback(!error);
-            // (what each entity asked got, split by day, over the time asked: an entity absent
+            // (what each entity asked got, over the time asked: an entity absent
             // from the answer has nothing there — kept as such, not asked again; a failure:
             // nothing kept, asked again at the next update)
+            const _rows = new Map();
             if( !error ) for( const id of q.ids ) {
                 const a = result?.[id] ?? [];
                 // (an entity's history — its state at the start included, see historyRequest —
@@ -1486,28 +1628,36 @@ export class CardHistory
                     if( _from !== null && _from > q.b0 + 60e3 && _from > ( this._histFrom?.get(id) ?? -Infinity ) ) ( this._histFrom ??= new Map() ).set(id, _from);
                 }
                 const _period = periodMs(periodOfKind(q.kind, this.statistics.period));
-                const rows = q.kind === 'history' ? a.map(x => ({ last_changed: x.lu * 1000, state: x.s })) : a.map(x => this._statisticsRow(x, _period));
-                const _layer = LAYER[q.kind];
-                // (the latest period of statistics Home Assistant was seen to have compiled, by
-                // layer — any entity's: it compiles a period for all of them at once, the
-                // periods in order —, and when it was seen — the time it was asked: compiled
-                // by then; see _forgetToday)
-                const _last = q.kind !== 'history' && rows.length ? msOf(rows[rows.length - 1].last_changed) : null, _seen = this._compiledUntil?.get(_layer);
-                if( _last !== null && _last > ( _seen?.until ?? -Infinity ) ) ( this._compiledUntil ??= new Map() ).set(_layer, { until: _last, seenAt: q.at });
-                let p = 0;
-                for( let i = this._slotAt(q.b0), i1 = this._slotAt(q.b1 - 1); i <= i1; i++ ) {
-                    const s = this.cache[i];
-                    let k = p;
-                    while( k < rows.length && msOf(rows[k].last_changed) < s.b ) k++;
-                    this._mergeLayer(_layer, i, id, rows.slice(p, k), Math.max(q.b0, s.a), Math.min(q.b1, s.b));
-                    s.askedAt[_layer].set(id, q.at);
-                    p = k;
+                _rows.set(id, q.kind === 'history' ? a.map(x => ({ last_changed: x.lu * 1000, state: x.s })) : a.map(x => this._statisticsRow(x, _period)));
+            }
+            if( !error ) {
+                // (how far it's known: the history as of when it was asked; statistics as of what Home
+                // Assistant had compiled — the latest end of its 5-minute or hourly ones it gave, or was
+                // seen to have given before it was asked, or ended RECORDER_WRITE_MAX_MS before —, final
+                // until the period holding that — the day, week, month going on: so far)
+                const _name = q.kind === 'history' ? null : periodOfKind(q.kind, this.statistics.period), _c = _name ? compiledOf(_name) : null;
+                let _seen = -Infinity;
+                for( const rows of _rows.values() ) {
+                    const _l = rows[rows.length - 1];
+                    // (the last time Home Assistant dated — a value recorded, never the state in force
+                    // at the request's start, dated by the card; the end of a period it compiled —: its
+                    // clock there at least, see _noteHaTime)
+                    if( _l && ( _name ? _name === _c : msOf(_l.last_changed) > q.b0 ) ) _seen = Math.max(_seen, msOf(_l.statistics?.end ?? _l.last_changed));
                 }
+                this._noteHaTime(_seen);
+                let upto = q.at, proof = q.at;
+                if( _name ) {
+                    if( _name === _c && _seen > ( HA_KNOWN.compiled.get(_c) ?? -Infinity ) ) HA_KNOWN.compiled.set(_c, _seen);
+                    proof = Math.max(q.compiled ?? -Infinity, _name === _c ? _seen : -Infinity, q.at - RECORDER_WRITE_MAX_MS);
+                    upto = Math.max(q.b0, Math.min(q.b1, this._periodsOver(_name, proof, proof)[0]));
+                }
+                for( const [id, rows] of _rows ) this._mergeLayer(LAYER[q.kind], id, rows, q.b0, q.b1, q.at, upto, proof);
             }
             perf.add('part', performance.now() - _t);
+            this._checkCache('answer');
             this._cacheVersion = this.cacheVersion() + 1;
             // (each timed while the performance test records)
-            if( !error ) { const _tp = performance.now(); this._purge(); perf.add('purge', performance.now() - _tp); }
+            if( !error ) { const _tp = performance.now(); this._purge(); perf.add('purge', performance.now() - _tp); this._checkCache('purge'); }
             // (what's still lacking asked at once, before this answer is drawn: Home Assistant
             // works on it meanwhile)
             if( !error ) { const _ta = performance.now(); this._askMissing(); perf.add('ask', performance.now() - _ta); }
@@ -1541,7 +1691,8 @@ export class CardHistory
     _askHA(request, o = {})
     {
         // (made when it's sent: the states of the entities it asks noted then — noteAskedStates)
-        const _make = () => { const r = typeof request === 'function' ? request() : request; if( r ) this.noteAskedStates(r); return r; };
+        // (o.sent: told when it's sent)
+        const _make = () => { const r = typeof request === 'function' ? request() : request; if( r ) { this.noteAskedStates(r); o.sent?.(); } return r; };
         if( !perf.on ) return haRequests.request(() => { const r = _make(); return r ? this._hass.callWS(r) : {}; }, o);
         // (timed while the performance test records: how long it waited in the queue, how long
         // Home Assistant took, what it asked and gave, whether it brought some of the window
@@ -1648,7 +1799,7 @@ export class CardHistory
 
     updateHistoryAutoRefresh()
     {
-        const now = moment();
+        const now = moment(this.askNow());
         const last = moment(this.endTime);
 
         // If auto scroll is allowed (scrolled at or past the previous last event) then adjust the x position
@@ -1673,58 +1824,55 @@ export class CardHistory
         this._requests = [];
         this._flying = new Map();
         this._histFrom = new Map();
-        this._compiledUntil = new Map();
         this.state.loading = false;
-        this.cache.length = 0;
-        // (from nothing: the page's cache of this card is this one, emptied — never one another
-        // card of the same name and YAML put there, see initCache)
+        // (from nothing: a new cache, the page's cache of this card — never one another card of
+        // the same name and YAML put there, see initCache)
+        this.cache = newStore(gridDown(Date.now(), DAY_MS) - this.cacheSize * DAY_MS);
         if( this.pageKey ) { clearTimeout(PAGE_CACHES.get(this.pageKey)?.tid); PAGE_CACHES.set(this.pageKey, { cache: this.cache }); }
         this.updateHistory();
     }
 
-    // What was asked before its day ended — the history, the statistics once a new period of
-    // theirs has been compiled since — to be asked again:
-    // what came since (the refresh): today's, and yesterday's too when it was asked before
-    // midnight, however long ago. Kept meanwhile, and drawn: replaced as each entity's answer
-    // comes, never something coarser in between
+    // What may have come since it was asked, to be asked again (the refresh): each known span's
+    // part from where it's final to its end made stale (see the cache) — the history's from
+    // when it was asked, at once; the 5-minute and hourly statistics' from upto, past the
+    // periods the entity's history shows without a number (Home Assistant compiles none there:
+    // final too, see _withoutNumber), once Home Assistant may have compiled the next one (its
+    // end, and STATS_LAG); the daily, weekly and monthly ones' — the one going on so far — from
+    // upto, once it may have compiled an hour more since (proof). Asked again at each refresh
+    // until it has. Its rows kept meanwhile, and drawn: replaced as each entity's answer comes,
+    // never something coarser in between
     _forgetToday()
     {
-        if( !this.cache.length ) return;
-        this._extendToNow();
-        // (statistics of a period: a new row once a period has ended — and been compiled,
-        // STATS_LAG — since they were asked; nothing new before, unless the last one compiled
-        // then didn't come)
-        const _now = Date.now(), _period = Object.fromEntries(Object.entries(LAYER).map(([k, l]) => [l, k === 'history' ? null : periodOfKind(k, this.statistics.period)]));
-        // (the last period compiled at time t: its start — a day, a week, a month on the local calendar)
-        const _unit = { day: 'day', week: 'isoWeek', month: 'month' };
-        const _compiled = (t, p) => _unit[p] ? moment(t - STATS_LAG).startOf(_unit[p]).valueOf() : Math.floor(( t - STATS_LAG ) / periodMs(p));
-        // (the last period compiled when they were asked — the one ended before _compiled's —
-        // if it's in slot s and not among its rows — Home Assistant later with it than
-        // STATS_LAG —: its start, asked again from there at each refresh until it comes; else null)
-        // Never one that won't come: Home Assistant compiles a period for every entity at once,
-        // and none for an entity without a valid number in it — compiled for another entity
-        // since, or this one's history there without a number: no row for it. Compiled for
-        // another entity: only when this one was asked after that was seen (seenAt) — asked
-        // before, its row may not have been compiled yet: asked again
-        const _missing = (s, l, id, at) => { const p = _period[l], k = _compiled(at, p), t = _unit[p] ? moment(k).subtract(1, p).valueOf() : ( k - 1 ) * periodMs(p);
-            if( t < s.a || t >= s.b || ( s[l].get(id) ?? [] ).some(x => msOf(x.last_changed) === t) ) return null;
-            const _c = this._compiledUntil?.get(l);
-            if( _c && _c.until >= t && at >= _c.seenAt ) return null;
-            return this._withoutNumber(id, t, _unit[p] ? moment(t).add(1, p).valueOf() : t + periodMs(p)) ? null : t; };
-        for( const s of this.cache ) {
-            const _end = msOf(s.end);
-            // (every source's cover cut at the time it was asked, where something may have come
-            // since: asked again — the statistics their whole day, the history its hours from
-            // then — see _lacking)
-            for( const l of LAYERS ) for( const [id, at] of s.askedAt[l] ) {
-                const _cuts = [];
-                if( at < _end && ( !_period[l] || _compiled(_now, _period[l]) > _compiled(at, _period[l]) ) ) _cuts.push(at);
-                const _t = _period[l] ? _missing(s, l, id, at) : null;
-                if( _t !== null ) _cuts.push(_t);
-                const _at = minOf(_cuts);
-                if( _cuts.length ) s.cover[l].set(id, ( s.cover[l].get(id) ?? [] ).map(([p, q]) => [p, Math.min(q, _at)]).filter(([p, q]) => q > p));
+        if( !this._cacheReady() ) return;
+        const _now = this.askNow();
+        for( const l of LAYERS ) {
+            const _name = l === 'hist' ? null : periodOfKind(Object.keys(LAYER).find(k => LAYER[k] === l), this.statistics.period), _P = _name ? periodMs(_name) : 0;
+            for( const [id, tr] of this.cache.layers[l] ) {
+                let spans = tr.spans;
+                for( const s of tr.spans ) {
+                    if( s.stale ) continue;
+                    let from = Math.max(s.a, s.upto ?? s.at), due = from;
+                    if( _name && !CALENDAR_UNITS[_name] ) {
+                        while( from < s.b && this._withoutNumber(id, from, from + _P) ) from += _P;
+                        due = from + _P + STATS_LAG;
+                    } else if( _name ) due = ( s.proof ?? from ) + HOUR_MS + STATS_LAG;
+                    if( from < s.b && _now >= due ) spans = setSpan(spans, from, s.b, { ...s, stale: true });
+                }
+                tr.spans = spans;
             }
         }
+        this._checkCache('refresh');
+    }
+
+    // Does entity id's history show no number from a to b (ms) — known to the end of it (asked
+    // after b: see the cache), every state in force there unavailable, unknown…? Home Assistant
+    // compiles no statistics there
+    _withoutNumber(id, a, b)
+    {
+        const tr = this._track('hist', id);
+        if( !tr || outside(a, b, tr.spans.filter(known).map(s => [s.a, Math.min(s.b, s.upto ?? s.at)])).length ) return false;
+        const k = rowIndex(tr.rows, a, true);
+        return [k ? tr.rows[k - 1] : null, ...tr.rows.slice(k, rowIndex(tr.rows, b))].every(x => !x || x.state === '' || x.state === null || isNaN(Number(x.state)));
     }
 
     // --------------------------------------------------------------------------------------
@@ -1737,8 +1885,8 @@ export class CardHistory
     {
         return {
             type: "history/history_during_period",
-            start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
-            ...( t1 !== null ? { end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ') } : {} ),
+            start_time: utcText(t0),
+            ...( t1 !== null ? { end_time: utcText(t1) } : {} ),
             minimal_response: !withAttributes,
             no_attributes: !withAttributes,
             entity_ids: ids
@@ -1778,8 +1926,8 @@ export class CardHistory
     {
         return {
             type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? "recorder/statistics_during_period" : "history/statistics_during_period",
-            start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
-            end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
+            start_time: utcText(t0),
+            end_time: utcText(t1),
             period,
             statistic_ids: ids
         };

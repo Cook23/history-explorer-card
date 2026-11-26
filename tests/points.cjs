@@ -613,7 +613,7 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The tooltip's modes (largeScreenTooltip: this screen is a large one): which curves it
+    // ── The tooltip's behaviors (largeScreenTooltip: this screen is a large one): which curves it
     // shows, opened by a hover or a click (whatever the pointer: the gesture engine's one click),
     // never acted on by a drag. Graph 1: rain and tank; near tank, away from rain ──
     // (each mode: what the tooltip shows near tank — a hover, a click; then a hover near rain

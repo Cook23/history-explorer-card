@@ -21,6 +21,46 @@ and fixes alike, must keep it so:
 - dead code removed, comments saying why rather than history, tests for every behavior.
 A change that would break this is redesigned, not merged.
 
+## The cache — set by the user
+
+One cache per card (`card-history.js`), shared by a card made again on the page: by source
+(the history, the 5-minute, hourly, daily, weekly and monthly statistics), by series, a track —
+its rows in time order, a row's time its only place, and its spans, the time asked (each when
+it was asked, and whether it's to be asked again). Nothing kept by day: midnight is a time like
+any other. The rules, checked after each change while the tests run (`_checkCache`):
+- an answer for a to b replaces the rows there, the span a to b known as of the time it was
+  asked — at each time, what's known as of the latest time stays: answers coming in any order,
+  one put only where it's the newest —; the states pushed meanwhile it doesn't have kept; the
+  history's first row there (the state in force at a, given by Home Assistant): where all the
+  time from the row before it is known, the same — dropped — or a change at that very time — a
+  value recorded —; else the state at a request's start, no value of the sensor;
+- a state pushed: a row at once, nothing else;
+- a span final until upto: the history as of when it was asked; statistics as of what Home
+  Assistant had compiled (proof: the latest end of its 5-minute or hourly statistics it gave,
+  or was seen to have given before, or ended an hour before) — the day, week or month going
+  on, given so far, until its start;
+- a refresh: each span's part after upto, to be asked again — the history's at once; the
+  5-minute and hourly statistics' past the periods the entity's history shows without a number
+  (Home Assistant compiles none there), once it may have compiled the next one (its end, and
+  10 minutes); the day, week or month going on once it may have compiled an hour more —; its
+  rows kept and drawn until the answer;
+- asked: what no known span holds (or a request under way brings); a gap: what no span holds;
+- read: a binary search — the finest source where it has a span, the coarser before its first
+  row there (the recorder's retention) and after its statistics' end;
+- purged: the farthest from the window first, rows and spans cut together, the state in force
+  kept at the cut;
+- times: all UTC (ms) — the local time only for the display; Home Assistant's clock, not
+  this device's — every time it dates (a state's last update, a value it recorded, the end of a
+  period it compiled) its clock there at least, the most it told kept on this device's steady
+  clock (never set): never told earlier than before; a span known as of that, asked up to the
+  later of the two clocks — now, for the window in real time too; what the page knows of Home
+  Assistant (its clock, what it compiled) one for all its cards; every duration this device
+  measures (the background's pace) on its steady clock. Its limit: Home Assistant's own clock
+  set back (its host's) — told later than it is until it's caught up again, the states pushed
+  covering the curves shown meanwhile; the requests' times
+  UTC, whole seconds; statistics asked by whole periods — 5 minutes and hours on UTC's grid,
+  days, weeks and months on Home Assistant's calendar (its time zone).
+
 ## Loading the window — set by the user
 
 What the window shown needs is asked to Home Assistant in phases (`card-history.js`), through

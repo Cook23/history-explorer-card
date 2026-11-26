@@ -166,7 +166,7 @@ module.exports = async function()
         return /makima/.test(before) && after === before ? true : before + ' => ' + after;
     });
     await t.step('a Tooltip choice is kept after a reload', async () => {
-        const modes = `JSON.stringify(el.instance.graphs.flatMap(g=>g.entities.map(e=>[e.largeChartTooltip ?? null, e.largeScreenTooltip, el.instance.tooltipModeOf(e)])))`;
+        const modes = `JSON.stringify(el.instance.graphs.flatMap(g=>g.entities.map(e=>[e.largeChartTooltip ?? null, e.largeScreenTooltip, el.instance.tooltipBehaviorOf(e)])))`;
         await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'nearest'); })()`); await t.wait(800);
         const before = await t.E(modes);
         await t.page.reload(); await t.wait(3500);

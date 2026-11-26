@@ -244,7 +244,7 @@ export class CardToolbar
             this.fitToCardWidth();
             // (a card crossing SMALL_CHART_PX, a window SMALL_SCREEN_PX: its curves' tooltip as there)
             const _tf = Object.values(this.tooltipFields()).join();
-            if( this._tooltipFields !== _tf ) { this._tooltipFields = _tf; this.applyTooltipModes(); }
+            if( this._tooltipFields !== _tf ) { this._tooltipFields = _tf; this.applyTooltipBehaviors(); }
             // (the time labels' step: as the density and the plot's width allow — setStepSize)
             this.setStepSize(true);
             // (the curves' columns of pixels: worked out again for the new width)
