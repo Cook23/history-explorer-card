@@ -1766,7 +1766,7 @@ export class CardHistory
 
     updateHistoryAutoRefresh()
     {
-        const now = moment();
+        const now = moment(this._askNow());
         const last = moment(this.endTime);
 
         // If auto scroll is allowed (scrolled at or past the previous last event) then adjust the x position

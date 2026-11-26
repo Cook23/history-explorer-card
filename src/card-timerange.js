@@ -52,7 +52,9 @@ export class CardTimeRange
     // most (_settleWindow)
     realTimeEnd()
     {
-        let endTime = moment();
+        // (now: the later of this device's clock and Home Assistant's — its values never after
+        // the end, this device's clock behind; see card-history.js _askNow)
+        let endTime = moment(this._askNow());
         if( this.pconfig.realTimeStep ) {
             const s = this.pconfig.realTimeStep.slice(0, -1);
             switch( this.pconfig.realTimeStep.slice(-1)[0] ) {
@@ -104,7 +106,7 @@ export class CardTimeRange
         }
         const _after = moment(this.endTime).diff(_end);
         this.state.nothingAfter = moment(this.endTime).diff(_limit) > -END_MS;
-        this.state.autoScroll = _after > -END_MS && moment(this.startTime).diff(moment.min(moment(), _end)) <= END_MS;
+        this.state.autoScroll = _after > -END_MS && moment(this.startTime).diff(moment.min(moment(this._askNow()), _end)) <= END_MS;
         this.state.realTimeGap = this.state.autoScroll ? Math.max(0, _after) : 0;
         this.showRealTime();
     }
@@ -265,7 +267,7 @@ export class CardTimeRange
     // Is the window following the new values (real time) — rather than the history?
     isLive()
     {
-        return !!this.state.autoScroll && moment() >= moment(this.startTime);
+        return !!this.state.autoScroll && moment(this._askNow()) >= moment(this.startTime);
     }
 
     // Where a range change without a point of its own keeps the window: [time, position

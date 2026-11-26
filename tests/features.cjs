@@ -161,9 +161,9 @@ module.exports = async function()
     }
 
     // ── A graph's menu: Export ▸, its graph's entities only — its history, ▸ its statistics
-    // by the period chosen (as the options menu's) ──
-    t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
-        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true } });
+    // by the period chosen (as the options menu's) — two days to noon: a whole day ended within ──
+    t = await openCard(card({ defaultTimeRange: '2d', statistics: { enabled: true }, csv: { separator: ';' },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true }, clock: '2026-11-20T12:00:00Z' });
     await t.wait(1500);
     {
         const at = sel => t.E(`(()=>{ const a=el.querySelector('${sel}'); const r=a.getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2 }; })()`);
@@ -176,7 +176,9 @@ module.exports = async function()
             return lines.includes('sensor.power') && !lines.includes('sensor.rain') && !(await t.E(`el.querySelector('#et_0').style.display !== 'none'`)) ? true : lines.slice(0, 3).join(' | ') || 'nothing saved';
         });
         await t.step('a graph\'s menu: Export ▸ Statistics ▸ Day — its own entities\' statistics by the day; the period then in bold in the options menu\'s too', async () => {
-            await t.page.mouse.click(5, 5); await t.wait(1200);
+            // (the menus closed — the window left where it is)
+            for( let i = 0; i < 3; i++ ) await t.page.keyboard.press('Escape');
+            await t.wait(600);
             await graphMenu(); await t.E('captureSave()'); await clickAt('#et_0_export'); await clickAt('#et_0_stats');
             // (each period's name without its count, * the one chosen last — in italic)
             const periods = await t.E(`[...el.querySelectorAll('#et_0_stats_sub a')].map(a=>a.textContent.trim().replace(/ \\(\\d+\\)$/, '')+(a.style.fontStyle==='italic'?'*':'')).join(' | ')`);

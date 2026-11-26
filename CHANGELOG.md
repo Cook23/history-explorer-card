@@ -15,6 +15,7 @@ Changelog for the HA History Explorer Card.
 - A gap in a curve wherever nothing was asked yet (before, only over a whole day)
 - A value recorded exactly at a request's start (midnight, for a day's) taken for the state Home Assistant repeats there: no value of the sensor — a silence drawn in smart mode. Where all the time before it is known, the state given at a request's start is the same as the row before it (nothing) or a change at that very time (a value recorded)
 - The device's clock not set as Home Assistant's, ahead of it: the values of the last minutes could be missed until the page was loaded again — the time a request covers now counted by Home Assistant's clock, told by the times it gives
+- The device's clock behind Home Assistant's: its newest values after the end of the window in real time, shown only once the device's time reached them — now the later of both clocks
 - Answers coming out of order (Home Assistant answering several requests at once): an older one could replace newer values until the next refresh — the newest kept at each time
 - 5-minute statistics asked again from within a period: that period missing until a later refresh — asked by whole periods
 - The daily, weekly and monthly statistics asked on this device's calendar: a period cut in two where its time zone isn't Home Assistant's — asked on Home Assistant's
