@@ -2,7 +2,7 @@
 // (spans) — its logic against the odd cases: answers coming out of order, a request's start
 // and end, values Home Assistant gives outside what was asked, states pushed late or twice,
 // this device's clock set otherwise than Home Assistant's or set while the page is open, two
-// cards of a page, Home Assistant in another time zone, statistics by whole periods, the purge
+// cards of a page, an angle read by an option, Home Assistant in another time zone, statistics by whole periods, the purge
 // at fractions of a ms, a refresh while the same time is asked. Every test besides checks the
 // cache's rules after each change (lib.cjs, card-history.js _checkCache)
 const { openCard } = require('./lib.cjs');
@@ -100,6 +100,17 @@ module.exports = async function()
         const want = { day: ['2026-11-20T05:00', '2026-11-21T05:00'], dst: ['2026-11-01T04:00', '2026-11-03T05:00'], week: ['2026-11-16T05:00', '2026-11-23T05:00'],
                        month: ['2026-11-01T04:00', '2026-12-01T05:00'], fine: ['2026-11-20T12:00', '2026-11-20T12:10'], hour: ['2026-11-20T12:00', '2026-11-20T14:00'] };
         return JSON.stringify(r) === JSON.stringify(want) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // (a direction read by an option — the color of a curve by the wind's direction —, a year: drawn
+    // from statistics)
+    t = await openCard(card({ defaultTimeRange: '1y', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', color: { entity: 'sensor.wind', 0: 'red', 180: 'blue' } }] }] }),
+        { mock: { series: true }, clock: '2026-11-20T12:00:00Z' });
+    await t.wait(6000);
+    await t.step('an angle read by an option (a curve colored by the wind\'s direction): as a curve\'s — its history asked besides its statistics, Home Assistant\'s mean of an angle being wrong across 0', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance; return { angles: I._angleIds(I._statisticsIds()), hist: __ws.some(w => w.type === 'history/history_during_period' && w.ids.includes('sensor.wind') && Date.parse(w.start) < Date.now() - 7 * 86400e3) }; })()`);
+        return JSON.stringify(r.angles) === '["sensor.wind"]' && r.hist ? true : JSON.stringify(r);
     });
     done(await t.close());
 

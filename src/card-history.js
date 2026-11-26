@@ -444,17 +444,17 @@ export class CardHistory
         return [...ids];
     }
 
-    // The angles among the entities with statistics — circular (see circularPeriodOf) wherever
-    // one of its uses takes it as such, the entity being in the cache once —, but those of
-    // state class measurement_angle: Home Assistant averages the others as plain numbers —
-    // wrong across 0 —, so their history is asked besides wherever they're drawn from
-    // statistics (see _askMissing); a measurement_angle's statistics are a circular mean
-    // (Home Assistant's sensor/recorder.py), drawn as any other's
+    // The angles among the series with statistics — circular (see circularPeriodOf) wherever
+    // one of its uses takes it as such: a curve shown, or an option's entity (a color, a fill,
+    // an arrow's length — its own circular, as every option's levels give it), the series being
+    // in the cache once —, but those of state class measurement_angle: Home Assistant averages
+    // the others as plain numbers — wrong across 0 —, so their history is asked besides
+    // wherever they're drawn from statistics (see _askMissing); a measurement_angle's
+    // statistics are a circular mean (Home Assistant's sensor/recorder.py), read as any other's
     _angleIds(statIds)
     {
-        const _angles = new Set();
-        for( const g of this.graphs ) for( const e of g.entities )
-            if( this.circularPeriodOf(e) && this.getStateClass(e.entity) !== 'measurement_angle' ) _angles.add(e.entity);
+        const _uses = [...this.graphs.flatMap(g => g.entities), ...[...this.optionSeriesIds()].map(id => ({ entity: id, circular: this.resolveOption({ entity: id }, 'circular') }))];
+        const _angles = new Set(_uses.filter(e => this.circularPeriodOf(e) && this.getStateClass(e.entity) !== 'measurement_angle').map(e => e.entity));
         return statIds.filter(id => _angles.has(id));
     }
 
@@ -565,7 +565,7 @@ export class CardHistory
     generateGraphDataFromCache(cause, only = null, offscreenToo = false)
     {
         const _t = performance.now();
-        const t0 = msOf(this.startTime), t1 = msOf(this.endTime);
+        const t1 = msOf(this.endTime);
         // (what waited to be drawn again — see _drawSoon —: drawn now)
         if( !only || only === this._dirty ) this._dirty = undefined;
         this._lastDrawAt = performance.now();
