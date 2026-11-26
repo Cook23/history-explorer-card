@@ -303,11 +303,11 @@ export class CardDatasets
     buildChartData(result, colorHistory, graphs = null)
     {
         // The time window drawn: now (the later of this device's clock and Home Assistant's: see
-        // card-history.js _askNow), its start and end; a state without a value is a gap in a
+        // card-history.js askNow), its start and end; a state without a value is a gap in a
         // curve (isGap) — unavailable or unknown with showUnavailable, one a stateMap doesn't
         // list with showMissingState —; else the curve goes over it
         const w = {
-            now: moment(this._askNow()), start: moment(this.startTime), end: moment(this.endTime),
+            now: moment(this.askNow()), start: moment(this.startTime), end: moment(this.endTime),
             isValid: state => !isMissingState(state) && state !== STATE_NOT_LISTED,
             isGap: state => state === STATE_NOT_LISTED ? this.pconfig.showMissingState : this.pconfig.showUnavailable && isMissingState(state),
         };

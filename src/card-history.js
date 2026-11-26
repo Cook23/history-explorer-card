@@ -315,7 +315,7 @@ export class CardHistory
     // How far Home Assistant may have values (ms): the later of this device's now and Home
     // Assistant's (_haNow) — what is asked goes there: asking past what it has costs nothing,
     // knowing it never comes from that (see _haNow)
-    _askNow()
+    askNow()
     {
         return Math.max(Date.now(), this._haNow());
     }
@@ -522,7 +522,7 @@ export class CardHistory
         if( i0 > 0 && !outside(msOf(all[i0 - 1].last_changed), T0, _seen).length ) i0--;
         if( i1 < all.length ) i1++;
         const out = all.slice(i0, i1);
-        out.notLoaded = outside(T0, Math.min(T1, this._askNow()), _seen);
+        out.notLoaded = outside(T0, Math.min(T1, this.askNow()), _seen);
         return out;
     }
 
@@ -739,7 +739,7 @@ export class CardHistory
     _lacking(layer, id, A, B, flying = true)
     {
         if( !this._cacheReady() ) return [];
-        A = Math.max(A, this.cache.from, layer === 'hist' ? this._histFrom?.get(id) ?? -Infinity : -Infinity); B = Math.min(B, this._askNow());
+        A = Math.max(A, this.cache.from, layer === 'hist' ? this._histFrom?.get(id) ?? -Infinity : -Infinity); B = Math.min(B, this.askNow());
         if( B <= A ) return [];
         const cov = flying ? [...( this._flying?.get(layer + ' ' + id) ?? [] )] : [];
         appendAll(cov, rangesOf(this._track(layer, id)?.spans ?? [], known));
@@ -768,7 +768,7 @@ export class CardHistory
             const r = rangesOf(this._track(layer, id)?.spans ?? [], known).find(([p, q]) => p < a && a <= q), k = r ? rowIndex(rows, r[0]) : rows.length;
             if( k < rows.length && msOf(rows[k].last_changed) < a ) return a;
         }
-        b = Math.min(b, this._askNow());
+        b = Math.min(b, this.askNow());
         const k = rowIndex(rows, a);
         return k < rows.length && msOf(rows[k].last_changed) < b ? msOf(rows[k].last_changed) : b;
     }
@@ -781,7 +781,7 @@ export class CardHistory
     _span(kind, a, b)
     {
         if( kind !== 'history' ) return this._periodsOver(periodOfKind(kind, this.statistics.period), a, b);
-        return [a, b >= this._askNow() - 1000 ? gridUp(b, HOUR_MS) : b];
+        return [a, b >= this.askNow() - 1000 ? gridUp(b, HOUR_MS) : b];
     }
 
     // The whole periods of statistics of a period ('5minute', 'hour', 'day', 'week', 'month')
@@ -876,7 +876,7 @@ export class CardHistory
     {
         const _fresh = ids.filter(id => !PROBES.has(id));
         if( _fresh.length ) {
-            const _now = this._askNow();
+            const _now = this.askNow();
             const _valid = l => l.forEach(id => SENSOR_GAPS.set(id, { fine: true, hour: true }));
             // (kept on this device only when told by the history — Home Assistant failing: every
             // statistics valid for this page only)
@@ -1059,7 +1059,7 @@ export class CardHistory
     // last row since then — where they were asked since then, without any; null: not asked then
     _statsEnd(layer, id)
     {
-        const tr = this._track(layer, id), Z = this._askNow() - 2 * DAY_MS;
+        const tr = this._track(layer, id), Z = this.askNow() - 2 * DAY_MS;
         if( !tr ) return null;
         if( rowIndex(tr.rows, Z) < tr.rows.length ) return msOf(tr.rows[tr.rows.length - 1].statistics.end);
         const s = tr.spans.find(x => x.b > Z);
@@ -1085,8 +1085,8 @@ export class CardHistory
         // (the cache made on the first call)
         if( !this._cacheReady() ) this.initCache();
 
-        // (how far Home Assistant may have values: see _askNow)
-        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _now = this._askNow(), G = this._geometry(), r = G.r;
+        // (how far Home Assistant may have values: see askNow)
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _now = this.askNow(), G = this._geometry(), r = G.r;
         // (a new window, or new curves: the background no sooner than AHEAD_GAP_MS after it — a gesture going on)
         const _key = [this.startTime, this.endTime, ...this.historyEntityIds()].join();
         if( _key !== this._aheadKey ) { this._aheadKey = _key; this._backgroundNext = Math.max(this._backgroundNext ?? 0, Date.now() + AHEAD_GAP_MS); }
@@ -1209,7 +1209,7 @@ export class CardHistory
     _background(plans, t0, t1, G, side, size)
     {
         if( !this._backgroundFree() ) return;
-        const _now = this._askNow(), r = G.r;
+        const _now = this.askNow(), r = G.r;
         // (the first block some of ids lack: { a, b }, null for none)
         const _first = (kind, ids, blocks) => { for( const [a, b] of blocks ) if( ids.some(id => this._lacking(LAYER[kind], id, a, b).length) ) return { a, b }; return null; };
         const _angles = new Set(this._angleIds([...plans.values()].filter(p => p.fam.length).map(p => p.u[0])));
@@ -1451,7 +1451,7 @@ export class CardHistory
         // (each kind once: what came, or is coming, not asked again)
         const _lacks = (kind, a, b) => id => this._lacking(LAYER[kind], id, a, b).length > 0;
         // (over the window's periods; the 5-minute ones over its last day — until now)
-        const _e = Math.min(msOf(this.endTime), this._askNow()), [a0, b0] = this._span(_longKind, msOf(this.startTime), _e), [a1, b1] = this._span('fine', _e - DAY_MS, _e);
+        const _e = Math.min(msOf(this.endTime), this.askNow()), [a0, b0] = this._span(_longKind, msOf(this.startTime), _e), [a1, b1] = this._span('fine', _e - DAY_MS, _e);
         const L = _long.filter(_lacks(_longKind, a0, b0)), F = _fine.filter(_lacks('fine', a1, b1));
         if( L.length ) this._ask(_longKind, a0, b0, L, { background: true });
         else if( F.length ) this._ask('fine', a1, b1, F, { background: true });
@@ -1766,7 +1766,7 @@ export class CardHistory
 
     updateHistoryAutoRefresh()
     {
-        const now = moment(this._askNow());
+        const now = moment(this.askNow());
         const last = moment(this.endTime);
 
         // If auto scroll is allowed (scrolled at or past the previous last event) then adjust the x position
@@ -1812,7 +1812,7 @@ export class CardHistory
     _forgetToday()
     {
         if( !this._cacheReady() ) return;
-        const _now = this._askNow();
+        const _now = this.askNow();
         for( const l of LAYERS ) {
             const _name = l === 'hist' ? null : periodOfKind(Object.keys(LAYER).find(k => LAYER[k] === l), this.statistics.period), _P = _name ? periodMs(_name) : 0;
             for( const [id, tr] of this.cache.layers[l] ) {
