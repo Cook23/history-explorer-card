@@ -662,6 +662,16 @@ export class CardHistory
         this.generateGraphDataFromCache(moved ? REDRAW_CAUSES.moved : REDRAW_CAUSES.window);
     }
 
+    // As updateHistory, for graphs gs only (built again: the others as they are): what the
+    // window lacks asked, what gs show — every graph showing one of their series — worked out
+    // and drawn again
+    updateHistoryOf(gs)
+    {
+        this.showDate();
+        this._askMissing();
+        this.generateGraphDataFromCache(REDRAW_CAUSES.window, new Set(gs.flatMap(g => g.entities.map(e => e.entity))));
+    }
+
     // The graphs resized: their curves worked out again when the plot's width changed by
     // PX_HYSTERESIS or more since they were drawn whole — a point a column of pixels (see
     // card-datasets.js _lineSamples): narrower, more values in a column; wider, fewer

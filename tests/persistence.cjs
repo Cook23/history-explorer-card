@@ -414,7 +414,7 @@ module.exports = async function()
     });
     await t.step('slow Home Assistant: a change made on the card before it answers is kept, and saved there', async () => {
         await t.page.reload(); await t.wait(400);
-        await t.E(`(()=>{ const I=el.instance, g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.setInterpolation(g, g.entities.filter(e=>e.entity==='sensor.power'), 'makima'); })()`);
+        await t.E(`(()=>{ const I=el.instance, g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.setInterpolation([{ g, entities: g.entities.filter(e=>e.entity==='sensor.power') }], 'makima'); })()`);
         await t.wait(5000);
         const b = await entry('sensor.power');
         const ha = await t.E(`(async()=>{ const v=(await el.instance._hass.callWS({ type: 'frontend/get_user_data', key: '${key}' })).value; return (v.entities||[]).find(e=>(e.entity??e)==='sensor.power')?.interpolation; })()`);
@@ -443,7 +443,7 @@ module.exports = async function()
         await t.drag(pt, { x: pt.x, y: pt.y + 60 }); await t.wait(900);
         const a = await lock();
         await reload(); const b = await lock();
-        await t.E(`(()=>{ const g = graphAt(0); el.instance.setInterpolation(g, g.entities, 'makima'); })()`); await t.wait(900);
+        await t.E(`(()=>{ const g = graphAt(0); el.instance.setInterpolation([{ g, entities: g.entities }], 'makima'); })()`); await t.wait(900);
         const c = await lock();
         return a.startsWith('locked') && b === a && c === a ? true : JSON.stringify({ a, b, c });
     });

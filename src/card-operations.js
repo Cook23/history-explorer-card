@@ -374,19 +374,22 @@ export class CardOperations
         this.writeLocalState();
     }
 
-    // Every entity of graph g shown as type (lineMode), saved so — the graph rebuilt once,
-    // in its place, when their types change
-    setGraphType(g, type, lineMode)
+    // Every entity of graphs gs shown as type (lineMode), saved so once for them all — a graph
+    // whose types change rebuilt in its place (once for them all, see rebuildGraphs), the others
+    // given the line mode as they are; what they show worked out once
+    setGraphsType(gs, type, lineMode)
     {
-        const _sameType = g.entities.every(e => ( e.type ?? g.type ) === type);
-        this._keepType(g.entities.map(e => this.store.entry(keyOf(e))), type, lineMode);
-        if( _sameType ) {
-            this.setLineMode(g, g.entities.map((e, i) => i), lineMode);
-            this.updateHistory();
-        } else {
-            g.entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
-            this._keepFill(this.rebuildInPlace(g));
+        const _rebuilt = [];
+        for( const g of gs ) {
+            const _sameType = g.entities.every(e => ( e.type ?? g.type ) === type);
+            // (a graph shown so already: as it is)
+            if( _sameType && g.entities.every(e => this.resolveOption(e, 'lineMode') === lineMode || lineMode === undefined) ) continue;
+            this._keepType(g.entities.map(e => this.store.entry(keyOf(e))), type, lineMode);
+            if( _sameType ) this.setLineMode(g, g.entities.map((e, i) => i), lineMode);
+            else { g.entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; }); _rebuilt.push(g); }
         }
+        if( _rebuilt.length ) { this.rebuildGraphs(_rebuilt); this._keepFill(_rebuilt.flatMap(g => g.entities)); }
+        else this.updateHistory();
         this.writeLocalState();
     }
 
@@ -407,14 +410,18 @@ export class CardOperations
         }
     }
 
-    // Entities of graph g drawn with the interpolation algorithm algo — those it applies to
-    // (see isInterpolated) — saved so
-    setInterpolation(g, entities, algo)
+    // The entities of pairs ([{ g, entities }]: some of a graph's) drawn with the interpolation
+    // algorithm algo — those it applies to (see isInterpolated) — saved so, once for them all
+    setInterpolation(pairs, algo)
     {
-        const _apply = entities.filter(e => this.isInterpolated(e, g));
-        // (g.entities' are the store's own entries: saved with them)
-        for( const e of _apply ) e.interpolation = algo;
-        this.setCurvesInterpolation(g, _apply, algo);
+        for( const { g, entities } of pairs ) {
+            // (a graph drawn again only when it changes there)
+            const _apply = entities.filter(e => this.isInterpolated(e, g) && e.interpolation !== algo);
+            if( !_apply.length ) continue;
+            // (g.entities' are the store's own entries: saved with them)
+            for( const e of _apply ) e.interpolation = algo;
+            this.setCurvesInterpolation(g, _apply, algo);
+        }
         this.writeLocalState();
     }
 
@@ -435,39 +442,56 @@ export class CardOperations
     // each, see rebuildGraph) → its entities
     rebuildInPlace(g, options = {})
     {
-        const _entities = g.entities;
-        const _nextG = this.nextGraph(g);
-        this.detachGraph(g);
-        this.rebuildGraph(_entities, g.groupId, _nextG, options);
-        this.refreshGraphControls();
-        this.updateHistory();
-        return _entities;
+        this.rebuildGraphs([g], options);
+        return g.entities;
     }
 
-    // The curves among entities of graph g given their default color back: the one the
-    // configuration gives them (configuredColor), else each its class's first free in the
-    // graph, else the palette's (autoColor) — saved so, the graph rebuilt in its place
-    setCurvesAutoColor(g, entities)
+    // Graphs gs built again in their places, each from its entities (options: see
+    // rebuildInPlace) — then the graphs' controls, what they lack asked, and what they show
+    // worked out once for them all: theirs only (the series they show — every graph showing one)
+    rebuildGraphs(gs, options = {})
     {
-        for( const e of entities ) {
+        for( const g of gs ) {
+            const _nextG = this.nextGraph(g);
+            this.detachGraph(g);
+            this.rebuildGraph(g.entities, g.groupId, _nextG, options);
+        }
+        this.refreshGraphControls();
+        this.updateHistoryOf(gs);
+    }
+
+    // The curves of pairs ([{ g, curves }]: the curves among a graph's entities) given their
+    // default color back: the one the configuration gives them (configuredColor), else each its
+    // class's first free in the graph, else the palette's (autoColor) — saved so, each graph
+    // rebuilt in its place, once for them all
+    setCurvesAutoColor(pairs)
+    {
+        for( const { g, curves } of pairs ) for( const e of curves ) {
             const _conf = this.configuredColor(e);
             const _used = g.entities.filter(x => x !== e).map(x => x.color);
             e.color = _conf ?? this.autoColor(e, _used) ?? this.getNextDefaultColor().color;
             e.colorSet = _conf !== undefined || undefined;
         }
-        this.rebuildInPlace(g);
+        this.rebuildGraphs(pairs.map(p => p.g));
         this.writeLocalState();
     }
 
-    // The look of the curves among entities of graph g — field (color, fill, width, dashMode,
-    // showMinMax, showPoints, yAxis — its side, the Behavior submenu's) set to value on each, saved so — the graph rebuilt in its place
-    // (showPoints: shown as it is, see showCurvePoints). A width:
-    // a sizePoints the YAML sets, the larger of it and its dots' default (dotDiameterOf). A fill:
-    // none (false), light (true its alias: the curve's color, light — following it), solid, or
-    // fading out downwards ('fade'); a color chosen: kept as the curve's own (colorSet)
-    setCurvesLook(g, entities, field, value)
+    // The look of the curves of pairs ([{ g, curves }]: the curves among a graph's entities) —
+    // field (color, fill, width, dashMode, showMinMax, showPoints, alignment, yAxis — its side,
+    // the Behavior submenu's) set to value on each, saved once for them all — each graph rebuilt
+    // in its place, what they show worked out once. Without a rebuild: the points (shown on the
+    // graph as they are, see showCurvePoints), an alignment (the time axes only: see
+    // applyTimeAxis). A width: a sizePoints the YAML sets, the larger of it and its dots' default
+    // (dotDiameterOf). A fill: none (false), light (true its alias: the curve's color, light —
+    // following it), solid, or fading out downwards ('fade'); a color chosen: kept as the curve's
+    // own (colorSet)
+    setCurvesLook(pairs, field, value)
     {
-        for( const e of entities ) {
+        // (only the graphs it changes something in: the others as they are)
+        const _kept = field === 'fill' ? fillKept(value) : value, _same = e => field === 'color' ? e.colorSet && e.color === value : JSON.stringify(e[field]) === JSON.stringify(_kept);
+        pairs = pairs.filter(p => p.curves.some(e => !_same(e)));
+        if( !pairs.length ) return;
+        for( const { curves } of pairs ) for( const e of curves ) {
             if( field === 'color' ) {
                 e.color = value;
                 e.colorSet = true;
@@ -478,22 +502,26 @@ export class CardOperations
             const _yamlSize = field === 'width' ? this.yamlOptionOf(e, 'sizePoints') : undefined;
             if( _yamlSize !== undefined ) e.sizePoints = Math.max(_yamlSize, this.dotDiameterOf(value));
         }
-        // (the points: only their size changes — shown on the graph as it is, never built again:
-        // the curves in the tooltip mode, the tooltip open, the point hovered kept)
-        if( field === 'showPoints' ) this.showCurvePoints(g, entities, value); else this.rebuildInPlace(g);
+        // (the points: only their size changes — the curves in the tooltip mode, the tooltip
+        // open, the point hovered kept)
+        if( field === 'showPoints' ) for( const { g, curves } of pairs ) this.showCurvePoints(g, curves, value);
+        else if( field !== 'alignment' ) this.rebuildGraphs(pairs.map(p => p.g));
         // (an alignment, a Y axis' side — a right one now, or none: the right room of every
         // graph worked out again — see applyTimeAxis)
         if( field === 'alignment' || field === 'yAxis' ) this.applyTimeAxes();
         this.writeLocalState();
     }
 
-    // Graph g's cursor line and tooltips across graphs (options: cursorMode, cursorTypes,
-    // tooltipMode — see cursorLineOf) set on each of its entities, as its alignment — saved
-    // so, the graph rebuilt in its place
-    setGraphCursor(g, options)
+    // The cursor line and tooltips across graphs of graphs gs (options: cursorMode,
+    // cursorTypes, tooltipMode — see cursorLineOf) set on each of their entities, as an
+    // alignment — given to each chart as it is (nothing drawn again: the line is drawn by
+    // Chart.js as the pointer moves), saved once for them all
+    setGraphsCursor(gs, options)
     {
-        for( const e of g.entities ) Object.assign(e, options);
-        this.rebuildInPlace(g);
+        for( const g of gs ) {
+            for( const e of g.entities ) Object.assign(e, options);
+            Object.assign(g.chart.options.plugins.hecCursorLine, this.cursorLineOf(g.type, g.entities[0]));
+        }
         this.writeLocalState();
     }
 
@@ -503,18 +531,22 @@ export class CardOperations
     toggleCurvePoints(g, entities)
     {
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
-        if( _curves.length ) this.setCurvesLook(g, _curves, 'showPoints', _curves.every(e => allPointsShown(this.resolveOption(e, 'showPoints'))) ? 'hover' : true);
+        if( _curves.length ) this.setCurvesLook([{ g, curves: _curves }], 'showPoints', _curves.every(e => allPointsShown(this.resolveOption(e, 'showPoints'))) ? 'hover' : true);
     }
 
-    // The tooltip's behavior of the curves among entities of graph g (see tooltipBehaviorOf) — for
-    // where the card is now, in the option giving each one's behavior (tooltipFieldOf): its
-    // room's when set, else its screen's; saved so, on this device only
-    setCurvesTooltip(g, entities, behavior)
+    // The tooltip's behavior of the curves of pairs ([{ g, curves }]: see tooltipBehaviorOf) —
+    // for where the card is now, in the option giving each one's behavior (tooltipFieldOf): its
+    // room's when set, else its screen's; saved so, on this device only, once for them all
+    setCurvesTooltip(pairs, behavior)
     {
         const _f = this.tooltipFields();
-        const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
-        for( const e of _curves ) e[this.tooltipFieldOf(e, _f)] = behavior;
-        this.applyTooltipBehaviors(g);
+        for( const { g, curves } of pairs ) {
+            // (a graph given it again only when it changes there)
+            const _set = curves.filter(e => this.isCurve(g, g.entities.indexOf(e)) && this.tooltipBehaviorOf(e) !== behavior);
+            if( !_set.length ) continue;
+            for( const e of _set ) e[this.tooltipFieldOf(e, _f)] = behavior;
+            this.applyTooltipBehaviors(g);
+        }
         this.writeLocalState();
     }
 

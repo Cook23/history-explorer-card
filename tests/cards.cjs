@@ -166,7 +166,7 @@ module.exports = async function()
             && r.cleared.gaps === '— no hover yet —' && r.cleared.log === '' && r.cleared.yes === 0 && r.first < 300;
         return ok ? true : JSON.stringify(r);
     });
-    await t.step('Tests ▸ Performance: the card as it is (its graphs, the statistics\' verdicts), its graphs drawn again (by graph), those on the screen told, the window loaded again from nothing (each request: its phase, its source, its time, its entities on the screen, waited, took), the window moved (\'<\', \'>\' 3 times, a drag), the real time — each timed, the graphs drawn again counted by cause, what follows each answer timed, the page\'s freezes counted', async () => {
+    await t.step('Tests ▸ Performance: the card as it is (its graphs, the statistics\' verdicts), its graphs drawn again (by graph), those on the screen told, the window loaded again from nothing (each request: its phase, its source, its time, its entities on the screen, waited, took), the window moved (\'<\', \'>\' 3 times, a drag), choices and gestures (a curve\'s look, every curve\'s, the cursor line on every graph, the pointer along a curve, a zoom — nothing saved, the curves set back), the real time — each timed, the graphs drawn again counted by cause, what follows each answer timed, the page\'s freezes counted', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
         await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
@@ -184,6 +184,10 @@ module.exports = async function()
             && /== The window loaded again from nothing\n(  (phase \d|background|export) +(history|5minute|hour|day|week|month|stats) +[-+]?[\d.]+ d → ([-+][\d.]+ d|now)  \d+ entities \(\d+ on the screen\), \d+ values — waited [\d.]+ s, took [\d.]+ s.*\n)+  whole after [\d.]+ s: \d+ requests/.test(out)
             && /answers put in the cache/.test(out) && /== '<' clicked 3 times: whole after/.test(out) && /== '>' clicked 3 times: whole after/.test(out) && /== dragged back .*: whole after/.test(out)
             && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out)
+            // (choices and gestures: each over after, its longest frame, its late frames, the graphs drawn — the pointer drawing none)
+            && /== Choices and gestures\n  a curve's look changed \(its width\): over after \d+ ms, the longest frame \d+ ms, \d+ frames over 50 ms — \d+ graphs drawn; \d+ freezes/.test(out)
+            && /the pointer along a curve \(30 moves, its tooltip following it\): over after \d+ ms, the longest frame \d+ ms, \d+ frames over 50 ms — 0 graphs drawn/.test(out)
+            && /a zoom \(the window halved\): over after/.test(out) && /the window back to its length: over after/.test(out)
             // (the graphs drawn again: each cause, how many times — the window moved, by '<' and '>')
             && /the graphs drawn again \d+ times: \d+ ms in all, the longest \d+ ms \((answers from Home Assistant|the window moved|the window or its settings changed|a graph come on the screen|a graph off the screen, drawn after those on the screen) \d+/.test(out)
             && /== '<' clicked 3 times[^=]*the graphs drawn again \d+ times: [^\n]*the window moved \d+/.test(out)

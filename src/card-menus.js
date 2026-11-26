@@ -1199,10 +1199,10 @@ export class CardMenus
         // have it —, the browser's picker; the others, their list's values)
         const _lines = level === 'color' ? [
                 { id: `${m.prefix}_appearance_color_auto`, label: i18n('ui.menu.look_auto'), final: true, marked: _curves.length > 0 && _curves.every(({ e }) => { const c = this.configuredColor(e); return c !== undefined ? JSON.stringify(c) === JSON.stringify(e.color) : !e.colorSet; }),
-                  choose: () => { for( const { g, curves } of _byGraph ) this.setCurvesAutoColor(g, curves); _chosen(); } },
+                  choose: () => { this.setCurvesAutoColor(_byGraph); _chosen(); } },
                 { id: `${m.prefix}_appearance_color_pick`, label: i18n('ui.menu.look_pick'), choose: () => this._pickCurveColor(m.index) }]
             : ( _d.values ?? [] ).map(([v, label]) => ({ label: label.startsWith('ui.') ? i18n(label) : label, marked: v === _cur, final: true,
-                choose: () => { for( const { g, curves } of _byGraph ) this.setCurvesLook(g, curves, _d.field, v); _chosen(); } }));
+                choose: () => { this.setCurvesLook(_byGraph, _d.field, v); _chosen(); } }));
         // (from an entity — the one in use in bold)
         if( _INDIRECT_LOOK.includes(level) )
             // (lazy: its box — the entity selector's field, one per menu — filled only when opened)
@@ -1392,7 +1392,7 @@ export class CardMenus
                 const _curves = this._lookByGraph(m, key).flatMap(({ g, curves }) => curves.map(e => ({ g, e })));
                 const _on = _curves.length > 0 && _curves.every(({ e }) => this.resolveOption(e, 'colorTransition') === 'smooth');
                 _lines.push({ id: `${id}_blend`, label: i18n('ui.menu.look_blend'), on: _on,
-                    choose: () => { for( const { g, curves } of this._lookByGraph(m, key) ) this.setCurvesLook(g, curves, 'colorTransition', _on ? 'hard' : 'smooth'); this._fillMenu(m); } });
+                    choose: () => { this.setCurvesLook(this._lookByGraph(m, key), 'colorTransition', _on ? 'hard' : 'smooth'); this._fillMenu(m); } });
             }
             return _lines;
         }
@@ -1488,16 +1488,19 @@ export class CardMenus
         this._fillMenu(m);
     }
 
-    // List key of menu m's curves set to what valueOf(curve) gives, graph by graph (the same
-    // value for curves alike: one rebuild each)
+    // List key of menu m's curves set to what valueOf(curve) gives (the curves given the same
+    // value together, in every graph: one change each)
     _setIndirect(m, key, valueOf)
     {
-        const _field = _APPEARANCE[key].field;
-        for( const { g, curves } of this._lookByGraph(m, key) ) {
-            const _by = new Map();
-            for( const e of curves ) { const v = valueOf(e), k = JSON.stringify(v); if( !_by.has(k) ) _by.set(k, { v, es: [] }); _by.get(k).es.push(e); }
-            for( const { v, es } of _by.values() ) this.setCurvesLook(g, es, _field, v);
+        const _field = _APPEARANCE[key].field, _by = new Map();
+        for( const { g, curves } of this._lookByGraph(m, key) ) for( const e of curves ) {
+            const v = valueOf(e), k = JSON.stringify(v);
+            if( !_by.has(k) ) _by.set(k, { v, pairs: new Map() });
+            const P = _by.get(k).pairs;
+            if( !P.has(g) ) P.set(g, []);
+            P.get(g).push(e);
         }
+        for( const { v, pairs } of _by.values() ) this.setCurvesLook([...pairs].map(([g, curves]) => ({ g, curves })), _field, v);
     }
 
     // The menu's curve colored as chosen in the browser's color picker — the menu closed (the
@@ -1512,10 +1515,7 @@ export class CardMenus
         // (every entity the menu acts on: one, or a graph's arrowline rows)
         const _keys = entities.map(keyOf);
         this._pickColor(input_idx, this.entityColor(entities[0]), v => {
-            for( const _g of this.graphs ) {
-                const _es = _g.entities.filter(e => _keys.includes(keyOf(e)));
-                if( _es.length ) this.setCurvesLook(_g, _es, 'color', v);
-            }
+            this.setCurvesLook(this.graphs.map(g => ({ g, curves: g.entities.filter(e => _keys.includes(keyOf(e))) })).filter(p => p.curves.length), 'color', v);
         });
     }
 
@@ -1539,7 +1539,7 @@ export class CardMenus
     // The interpolation algo for menu m's curves — those interpolated
     _interpolationChosen(m, algo)
     {
-        for( const { g, entities } of this._scopeOf(m).pairs ) this.setInterpolation(g, entities, algo);
+        this.setInterpolation(this._scopeOf(m).pairs, algo);
         this._menuChosen(m);
     }
 
@@ -1556,15 +1556,15 @@ export class CardMenus
         if( !_menu ) return;
         const { kind, pairs } = this._scopeOf(m);
         if( action === 'tooltip' ) {
-            for( const { g, curves } of this._curvesByGraph(m) ) this.setCurvesTooltip(g, curves, value);
+            this.setCurvesTooltip(this._curvesByGraph(m), value);
             return this._menuChosen(m);
         }
         if( action === 'cursor' ) {
-            for( const { g } of pairs ) this.setGraphCursor(g, { ..._CURSOR_CHOICES[value], cursorTypes: value === 'hide' ? undefined : ['all'] });
+            this.setGraphsCursor(pairs.map(p => p.g), { ..._CURSOR_CHOICES[value], cursorTypes: value === 'hide' ? undefined : ['all'] });
             return this._menuChosen(m);
         }
         if( action === 'yaxis' ) {
-            for( const { g, curves } of this._curvesByGraph(m) ) this.setCurvesLook(g, curves, 'yAxis', value);
+            this.setCurvesLook(this._curvesByGraph(m), 'yAxis', value);
             return this._menuChosen(m);
         }
         if( action === 'ylock' ) {
@@ -1604,7 +1604,7 @@ export class CardMenus
             // shown a moment in the selector's field
             return this.showAdded(m.index, this.addCurves(Array.isArray(_entity_id) ? _entity_id : [_entity_id], type, lineMode));
         }
-        if( kind === 'graph' || kind === 'card' ) for( const { g } of pairs ) this.setGraphType(g, type, lineMode);
+        if( kind === 'graph' || kind === 'card' ) this.setGraphsType(pairs.map(p => p.g), type, lineMode);
         else if( pairs.length && pairs[0].entities.length ) this.setCurveType(pairs[0].g, pairs[0].g.entities.indexOf(pairs[0].entities[0]), type, lineMode);
         this._menuChosen(m);
     }

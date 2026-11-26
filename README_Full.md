@@ -940,6 +940,7 @@ The ▾ button beside the entity selector opens the options menu, in submenus:
     - its graphs drawn again — the card's work (the rows read from the cache, the points worked out) and Chart.js's, graph by graph;
     - the window loaded again from nothing — each request: its phase, its source, the time it asks, its entities (how many on the screen) and values, how long it waited and Home Assistant took;
     - the window moved — *<* and *>* three times each, a drag;
+    - choices and gestures — a curve's look changed, every curve's (as the card's menu does), the cursor line and the tooltips on every graph, the pointer along a curve, with and without them, a zoom: each until the page is free again, its longest frame, its frames late, the graphs drawn (nothing saved meanwhile, the curves set back as they were);
     - the real time — each time the graphs are drawn again, what had them drawn (answers from Home Assistant, the window moved, the window or its settings changed, a graph come on the screen, a graph off the screen drawn after those on it); when the page froze;
     - on its own button, a return to the page after another app — what the card and Home Assistant's connection did until the graphs were drawn again: the card taken back, its graphs moved and shown, resized, each drawing and its cause.
 

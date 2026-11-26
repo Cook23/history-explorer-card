@@ -188,7 +188,7 @@ module.exports = async function()
         return r[0] === '#f9a825' && r[1] === '#1e88e5' ? true : JSON.stringify(r);
     });
     await t.step('Color ▸ Automatic: a color chosen, then Automatic — the class\'s back (power2: the next free one), Automatic then in bold; the YAML\'s color back for a curve that has one', async () => {
-        await t.E(`(()=>{ const I=el.instance; I.setCurvesLook(${graphOf('sensor.power2')}, [${curveOf('sensor.power2')}], 'color', '#ff0000'); I.setCurvesLook(${graphOf('sensor.tank')}, [${curveOf('sensor.tank')}], 'color', '#ff0000'); })()`); await t.wait(600);
+        await t.E(`(()=>{ const I=el.instance; I.setCurvesLook([{ g: ${graphOf('sensor.power2')}, curves: [${curveOf('sensor.power2')}] }], 'color', '#ff0000'); I.setCurvesLook([{ g: ${graphOf('sensor.tank')}, curves: [${curveOf('sensor.tank')}] }], 'color', '#ff0000'); })()`); await t.wait(600);
         await t.E(`(()=>{ const I=el.instance; I.showEntityCurveMenu(0, 'sensor.power2', ${graphOf('sensor.power2')}, { from: 'label', clientX: 100, clientY: 100 }); })()`); await t.wait(250);
         await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(200); await t.E(`el.querySelector('#et_0_appearance_color').click()`); await t.wait(200);
         const b0 = await t.E(`el.querySelector('#et_0_appearance_color_auto').style.fontWeight`);
@@ -198,7 +198,7 @@ module.exports = async function()
         await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(200); await t.E(`el.querySelector('#et_0_appearance_color').click()`); await t.wait(200);
         const b1 = await t.E(`el.querySelector('#et_0_appearance_color_auto').style.fontWeight`);
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(700);
-        await t.E(`el.instance.setCurvesAutoColor(${graphOf('sensor.tank')}, [${curveOf('sensor.tank')}])`); await t.wait(600);
+        await t.E(`el.instance.setCurvesAutoColor([{ g: ${graphOf('sensor.tank')}, curves: [${curveOf('sensor.tank')}] }])`); await t.wait(600);
         const tank = await t.E(`${curveOf('sensor.tank')}.color`);
         return b0 !== 'bold' && p2 === '#1e88e5' && b1 === 'bold' && tank === '#0000ff' ? true : JSON.stringify({ b0, p2, b1, tank });
     });

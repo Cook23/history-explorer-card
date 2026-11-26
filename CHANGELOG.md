@@ -4,6 +4,30 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.93] - 2026-11-26
+
+### Added
+- *Tests ▸ Performance*: choices and gestures — a curve's look changed, every curve's (as the card's menu does), the cursor line and the tooltips on every graph, the pointer along a curve with and without them, a zoom —, each until the page is free again, its longest frame, its frames late, the graphs drawn (nothing saved meanwhile, the curves set back as they were)
+
+### Changed
+- The window of the graphs on the screen asked first (their coarse values, then their fine ones), then that of the graphs off the screen, then the sides: what's shown complete sooner, Home Assistant's work the same
+- What follows the pointer — the cursor line, the hover dot, the points the tooltip highlights — drawn on a layer of its own over each graph, the tooltip in its floating element: a graph drawn again only when its data or its layout changes, never for the pointer; a highlighted point no longer fades out (it goes with its tooltip)
+- The tooltip's `selected`, `nearest`, `mixed` and `all` called its behaviors in the READMEs too
+
+### Fixed
+- A choice of the card's options menu (a cursor, an alignment, a look, a display, an interpolation, a tooltip, a Y axis side) froze the page for seconds — over 10 s on a tablet with many graphs —: every graph built again and the whole card worked out again and saved once for each graph. Now applied to every graph at once: each graph built again once at most (none for a cursor or an alignment), worked out once, saved once
+- A graph added or built again had every graph of the card drawn again — for each of its curves (its move handle shown): the card's opening and every rebuild slowed down as the card grows
+- A graph built again (a curve's look changed) had the whole card worked out again: now only the graphs showing its series
+- A choice the graphs already have (the value in bold chosen again) built them again: nothing done now
+- The cursor line drew every graph again at each move of the pointer — with *All graphs*, all of them: the page lagging. Now on a layer of its own, no graph drawn again; the other graphs' tooltips (*All graphs, with tooltips*) updated only when the point changes
+- The hover dot, and the tooltip's highlighted point, drew the graph again at each change: on a graph with many points, the tooltip lagging
+- A menu opened drew every graph again (their tooltips closed, even with none open)
+- A zoom (the wheel, the toolbar, the range menu) drew every graph twice — first with the data it had —; a resize three times: now once with its new time and data (a resize: once at its new size, once with its points worked out again)
+- An arrowline's values worked out with copies of each of them: some 30 % faster over a year of history
+
+### Internal
+- Tests (`speed`, new): the time each action keeps the page busy on a card of 17 graphs — every final choice of the card's, a graph's and a curve's menu, each menu opened, the pointer moved (a tooltip, the cursor line, with the tooltips on every graph), within budgets; the window changed (the wheel, zoom +, the range, '<') and resized: how many times each graph is drawn; (`menus`): every choice of the card's options menu over 9 graphs — worked out once, saved once, each graph built again once at most; (`graphmenu`): the cursor and the alignment chosen from the card's menu, no graph built again, the pointer moved, no graph drawn again; (`cache`): a load's requests, the graphs on the screen first; (`points`, `mouse`): the highlighted point and the hover dot read on the graph's layer; (`cards`): the performance test's choices and gestures. Chart.js: `hecPointsOf()`, the points a dataset drew (deps/Chart Custom.js.md)
+
 ## [v1.2.92] - 2026-11-26
 
 ### Added

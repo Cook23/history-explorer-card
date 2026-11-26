@@ -239,7 +239,7 @@ module.exports = async function()
         await t.E(`(()=>{ window.__copied = []; window.__refuse = false; Object.defineProperty(navigator, 'clipboard', { configurable: true,
             value: { writeText: x => window.__refuse ? Promise.reject(new Error('no')) : ( window.__copied.push(x), Promise.resolve() ) } }); })()`);
         // (the curve's dashes set as its Appearance submenu does)
-        await t.E(`(()=>{ const I = el.instance, g = I.graphs[0]; I.setCurvesLook(g, [g.entities[0]], 'dashMode', 'points'); I.toggleCurvePoints(g, [g.entities[0]]); })()`); await t.wait(800);
+        await t.E(`(()=>{ const I = el.instance, g = I.graphs[0]; I.setCurvesLook([{ g: g, curves: [g.entities[0]] }], 'dashMode', 'points'); I.toggleCurvePoints(g, [g.entities[0]]); })()`); await t.wait(800);
         const yaml = async (open, prefix, kind) => {
             await t.E('__copied.length = 0'); await open();
             await t.E(`el.querySelector('#${prefix}_export').click()`); await t.wait(300);
@@ -371,7 +371,7 @@ module.exports = async function()
             t = await openCard(cfg, { mock: { series: true } });
             await t.wait(1500);
             // (choices made in the menus: a width, a line style)
-            await t.E(`(()=>{ const I = el.instance, g = I.graphsInDisplayOrder().at(-1); I.setCurvesLook(g, [g.entities[0]], 'width', 4); I.setCurvesLook(g, [g.entities[0]], 'dashMode', 'points'); })()`); await t.wait(800);
+            await t.E(`(()=>{ const I = el.instance, g = I.graphsInDisplayOrder().at(-1); I.setCurvesLook([{ g: g, curves: [g.entities[0]] }], 'width', 4); I.setCurvesLook([{ g: g, curves: [g.entities[0]] }], 'dashMode', 'points'); })()`); await t.wait(800);
             const sig0 = await t.E(SIG), simple = await t.E(`el.instance.yamlObject({ kind: 'card' }, false)`), full = await t.E(`el.instance.yamlObject({ kind: 'card' }, true)`);
             const back = async o => { const b = await openCard(o, { mock: { series: true } }); await b.wait(1500); const r = await b.E(SIG); await b.close(); return r; };
             const s1 = await back(simple), s2 = await back(full);

@@ -239,14 +239,16 @@ export class CardToolbar
         if( Math.abs(this.lastWidth - w) > 2 ) {
             const _t = performance.now();
             this.lastWidth = w;
+            // (the time labels' step as the density and the new width allow — setStepSize —, set on
+            // each graph before it's drawn at its new size: drawn once with it)
+            this.setStepSize(false);
+            for( let g of this.graphs ) this.applyTimeAxis(g, false);
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
             // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot, its text sized)
             this.fitToCardWidth();
             // (a card crossing SMALL_CHART_PX, a window SMALL_SCREEN_PX: its curves' tooltip as there)
             const _tf = Object.values(this.tooltipFields()).join();
             if( this._tooltipFields !== _tf ) { this._tooltipFields = _tf; this.applyTooltipBehaviors(); }
-            // (the time labels' step: as the density and the plot's width allow — setStepSize)
-            this.setStepSize(true);
             // (the curves' columns of pixels: worked out again for the new width)
             this.plotWidthChanged();
             // (timed while the performance test records)
