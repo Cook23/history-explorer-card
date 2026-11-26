@@ -30,7 +30,7 @@ export const RIGHT_Y_AXIS = 'y-axis-1';
 export const NARROW_CARD_PX = 300;
 
 // A card narrower than this (px) has little room: its curves' tooltip follows
-// smallChartTooltip, else largeChartTooltip (see tooltipModeOf)
+// smallChartTooltip, else largeChartTooltip (see tooltipBehaviorOf)
 const SMALL_CHART_PX = 600;
 // A window narrower than this (px) is a small screen: its curves' tooltip follows
 // smallScreenTooltip, else largeScreenTooltip — about a card SMALL_CHART_PX wide when it's
@@ -67,7 +67,7 @@ export class CardCharts
         return isNaN(v) ? '' : '(' + formatNumber(v, rounding) + (unit ? ' ' + unit : '') + ')';
     }
 
-    newGraph(canvas, graphtype, datasets, config)
+    newGraph(canvas, graphtype, datasets, config, first)
     {
         // Any dataset drawn as a curve / as bars (a bar graph can hold both)
         const _hasCurves = ( graphtype == 'line' ) || ( graphtype == 'bar' && datasets.some(d => d.kind === 'line') );
@@ -175,14 +175,9 @@ export class CardCharts
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    // The cursor line (cursor.mode, cursor.types): on this graph, or on
-                    // every graph of the card at once
-                    hecCursorLine: {
-                        show: this.pconfig.cursorMode !== 'hide' &&
-                              ( this.pconfig.cursorTypes.includes('all') || this.pconfig.cursorTypes.includes(graphtype) ),
-                        shared: this.pconfig.cursorMode === 'all',
-                        color: this.pconfig.cursorLineColor
-                    }
+                    // The cursor line and the tooltips across graphs: the graph's own, from
+                    // its first entity (see cursorLineOf)
+                    hecCursorLine: this.cursorLineOf(graphtype, first)
                 }
             }
 
@@ -709,22 +704,36 @@ export class CardCharts
     }
 
     // How entity e's curve enters its graph's tooltip where the card is now (tooltipFields):
-    // the mode set for its room when there's one — the more precise —, else the one for the
+    // the behavior set for its room when there's one — the more precise —, else the one for the
     // screen (resolveTooltipOption): 'selected' — once a click on it selected it —,
     // 'nearest' — while it's the curve nearest the pointer —, 'mixed' — either —, 'all' — whenever a curve is that near (Chart.js hecTooltip)
-    tooltipModeOf(e)
+    tooltipBehaviorOf(e)
     {
         return this.resolveTooltipOption(e, this.tooltipFields());
     }
 
-    // Graph g's curves given their tooltip mode as it is now (tooltipModeOf) — each graph's
+    // Graph g's curves given their tooltip behavior as it is now (tooltipBehaviorOf) — each graph's
     // when g is null: the card changed screens
-    applyTooltipModes(g = null)
+    applyTooltipBehaviors(g = null)
     {
         for( const _g of g ? [g] : this.graphs ) {
-            _g.chart.data.datasets.forEach((ds, i) => { if( _g.entities[i] ) ds.hecTooltip = this.tooltipModeOf(_g.entities[i]); });
+            _g.chart.data.datasets.forEach((ds, i) => { if( _g.entities[i] ) ds.hecTooltip = this.tooltipBehaviorOf(_g.entities[i]); });
             _g.chart.hecEndTooltip();
         }
+    }
+
+    // The cursor line of a graph of type whose first entity is e — the graph's options, as its
+    // alignment (resolveOption: the entity's, its graph's, entityOptions', the card's, the
+    // default): cursor.mode — hide: none; auto: on this graph, while the pointer is over it;
+    // all: with every graph in all, at the same time — the pointer over any of them whose type
+    // cursor.types lists (all: every type), drawing it on all of them; tooltip.mode all, with
+    // cursor.mode all: its tooltip opened at that time too, the pointer over another graph
+    // (Chart.js hecCursorLine)
+    cursorLineOf(type, e)
+    {
+        const _mode = this.resolveOption(e, 'cursorMode'), _types = this.resolveOption(e, 'cursorTypes');
+        return { show: _mode !== 'hide' && ( _types.includes('all') || _types.includes(type) ), shared: _mode === 'all',
+                 tooltips: _mode === 'all' && this.resolveOption(e, 'tooltipMode') === 'all', color: this.pconfig.cursorLineColor };
     }
 
     // The size of the graphs' text, as the card's width says: text (the legend, the time
@@ -1066,7 +1075,7 @@ export class CardCharts
                 "pointsMode": this.resolveOption(d, 'showPoints'),
                 "sizePoints": this.pointsDiameterOf(d, this.resolveOption(d, 'lineWidth')),
                 "showMinMax": d.showMinMax,
-                "tooltip": this.tooltipModeOf(d),
+                "tooltip": this.tooltipBehaviorOf(d),
                 // (period of a circular entity in the units shown, before SI conversion)
                 // (an arrowline's: its entity's own, as it is — its means circular, see _arrowColumns)
                 "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this.circularPeriodOf(d) ?? 0 ) * Math.abs(this.drawScaleOf(d)) || null : _kind === 'arrowline' ? this.circularPeriodOf(d) : null,
@@ -1109,7 +1118,7 @@ export class CardCharts
             }
         }
 
-        const chart = this.newGraph(canvas, type, datasets, config);
+        const chart = this.newGraph(canvas, type, datasets, config, entities[0]);
         // (a graph added from the card: its close button, Chart.js' floating icon — a click on
         // it removes the graph, _onGraphClick)
         chart.options.closeButtonVisible = !isStatic;

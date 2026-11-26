@@ -165,6 +165,11 @@ const BLOCK_KEY_SYNONYMS = { uiColors: { cursorLine: ['cursorline'], gridLines: 
 // of it)
 const CURVE_TOOLTIP_KEYS = { largeScreen: 'largeScreenTooltip', smallScreen: 'smallScreenTooltip', largeChart: 'largeChartTooltip',
                              smallChart: 'smallChartTooltip', behavior: 'tooltipBehavior' };
+// A graph's cursor line and tooltips across graphs (cursor.mode, cursor.types, tooltip.mode —
+// at every level, a graph's options as alignment: see card-charts.js cursorLineOf): the names
+// the card keeps them under, read through the one chain (CardConfig.resolveOption)
+export const GRAPH_BLOCK_KEYS = { cursor: { mode: 'cursorMode', types: 'cursorTypes' }, tooltip: { mode: 'tooltipMode' } };
+const _GRAPH_BLOCK_NAMES = Object.values(GRAPH_BLOCK_KEYS).flatMap(b => Object.values(b));
 const _isBlock = v => !!v && typeof v === 'object' && !Array.isArray(v);
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -188,7 +193,8 @@ export const TICK_DENSITIES = { low: 4, medium: 3, high: 2, higher: 1, highest: 
 const HA_PERIODS = ['5minute', 'hour', 'day', 'week', 'month'];
 export const UI_PLACES = { hide: 0, top: 1, bottom: 2, both: 3 };
 const BLOCK_VALUES = {
-    tooltip   : { size: oneOf('tooltip.size', ['full', 'compact', 'slim', 'auto']), stateTextMode: oneOf('tooltip.stateTextMode', STATE_TEXT_MODES) },
+    tooltip   : { size: oneOf('tooltip.size', ['full', 'compact', 'slim', 'auto']), stateTextMode: oneOf('tooltip.stateTextMode', STATE_TEXT_MODES),
+                  mode: oneOf('tooltip.mode', ['auto', 'all']) },
     cursor    : { mode: oneOf('cursor.mode', ['auto', 'all', 'hide']), types: listOf('cursor.types', [...GRAPH_TYPES, 'all']) },
     timeTicks : { density: oneOf('timeTicks.density', Object.keys(TICK_DENSITIES)), densityOverride: oneOf('timeTicks.densityOverride', Object.keys(TICK_DENSITIES)),
                   dateFormat: oneOf('timeTicks.dateFormat', ['normal', 'short']) },
@@ -269,12 +275,12 @@ const _labelsShown = name => oneOf(name, [true, false, 'hover']);
 // justify-content — see card-graphs.js updateGraphHeader)
 export const HEADER_ALIGNS = { default: 'space-between', left: 'flex-start', right: 'flex-end', center: 'center' };
 
-// The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest, mixed
+// The tooltip's behavior of a curve (see card-charts.js tooltipBehaviorOf): selected, nearest, mixed
 // or all
-export const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
+export const TOOLTIP_BEHAVIORS = ['selected', 'nearest', 'mixed', 'all'];
 // showStateFor / showStatsFor: the values over a graph for every curve, or for the first one
 const SHOWN_FOR = ['all', 'first'];
-const _tooltipMode = name => oneOf(name, TOOLTIP_MODES);
+const _tooltipBehavior = name => oneOf(name, TOOLTIP_BEHAVIORS);
 
 // A number > 0, else not set
 const _positive = v => Number(v) > 0 ? Number(v) : undefined;
@@ -387,12 +393,12 @@ const OPTION_VALUES = {
     pointsPerHour : v => Number(v) > 0 ? Number(v) : undefined,
     aggregateFunc : oneOf('aggregateFunc', AGGREGATE_FUNCS),
     groupBy       : oneOf('groupBy', GROUP_BY),
-    largeScreenTooltip : _tooltipMode('largeScreenTooltip'),
-    smallScreenTooltip : _tooltipMode('smallScreenTooltip'),
-    largeChartTooltip  : _tooltipMode('largeChartTooltip'),
-    smallChartTooltip  : _tooltipMode('smallChartTooltip'),
-    // (a tooltip mode, or auto — each screen's own default)
-    tooltipBehavior    : oneOf('tooltipBehavior', [...TOOLTIP_MODES, 'auto']),
+    largeScreenTooltip : _tooltipBehavior('largeScreenTooltip'),
+    smallScreenTooltip : _tooltipBehavior('smallScreenTooltip'),
+    largeChartTooltip  : _tooltipBehavior('largeChartTooltip'),
+    smallChartTooltip  : _tooltipBehavior('smallChartTooltip'),
+    // (a tooltip behavior, or auto — each screen's own default)
+    tooltipBehavior    : oneOf('tooltipBehavior', [...TOOLTIP_BEHAVIORS, 'auto']),
     stateTextMode : oneOf('stateTextMode', STATE_TEXT_MODES),
     look          : oneOf('look', () => Object.keys(LOOKS)),
     // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
@@ -455,6 +461,8 @@ export function normalizeOptions(o)
         for( const [k, fn] of Object.entries(keys) ) if( b[k] !== undefined && b[k] !== null ) b[k] = fn(b[k]);
         r[block] = b;
     }
+    for( const [block, keys] of Object.entries(GRAPH_BLOCK_KEYS) )
+        if( _isBlock(r[block]) ) for( const [k, name] of Object.entries(keys) ) if( r[block][k] !== undefined && r[block][k] !== null ) r[name] = r[block][k];
     // (tooltipBehavior: the default of largeScreenTooltip and smallScreenTooltip — auto, theirs)
     if( r.tooltipBehavior && r.tooltipBehavior !== 'auto' ) { r.largeScreenTooltip ??= r.tooltipBehavior; r.smallScreenTooltip ??= r.tooltipBehavior; }
     return r;
@@ -481,7 +489,9 @@ export const OPTION_DEFAULTS = {
     lineGraphHeight: 250, barGraphHeight: 150, timelineBarHeight: 24, timelineBarSpacing: 40,
     showUnavailable: false, showMissingState: false, showCurrentValues: true, axisAddMarginMin: false, axisAddMarginMax: false, recordedEntitiesOnly: false,
     defaultTimeRange: '24h', defaultMagnifierMode: 'xy',
-    cursor: { mode: 'auto', types: ['timeline'] },
+    // (a graph's cursor line: on the graph pointed at, for timelines; the tooltip on the graph
+    // pointed at only — see card-charts.js cursorLineOf)
+    cursorMode: 'auto', cursorTypes: ['timeline'], tooltipMode: 'auto',
     tooltip: { showColorsLine: true, showColorsTimeline: true, size: 'auto', showDuration: false, showLabel: true },
     timeTicks: { density: 'high' },
     refresh: { automatic: true },
@@ -546,7 +556,7 @@ export const PERSISTENCE_CATEGORIES = ['range', 'entities', 'order'];
 const _GRAPH_OPTIONS = [...ENTITY_OPTION_KEYS.filter(k => !ENTITY_ONLY_KEYS.includes(k)), 'fill', 'arrowLength', 'arrowMax', 'arrowWeighting', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'sizePoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'alignment', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'alignment', ..._GRAPH_BLOCK_NAMES, 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
     'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor',
     'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'tooltipBehavior'];
@@ -555,7 +565,7 @@ const _GRAPH_OPTIONS = [...ENTITY_OPTION_KEYS.filter(k => !ENTITY_ONLY_KEYS.incl
 // else the card's
 export const GRAPH_HEADER_KEYS = ['showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader',
     'nameAdaptiveColor', 'iconAdaptiveColor', 'showStateFor', 'showStatsFor'];
-export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show', 'tooltip'];
+export const GRAPH_OPTION_KEYS = [...new Set([..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show', 'tooltip', ...Object.keys(GRAPH_BLOCK_KEYS)])];
 // The graph options kept on the graph (CardConfig.pconfig.graphs) and on its entities: all
 // but those consumed while the graph is read — interval (its entities'), exclude (its
 // wildcards') — and tooltipBehavior (folded into the tooltips by normalizeOptions)
@@ -564,7 +574,7 @@ export const GRAPH_STORED_KEYS = _GRAPH_OPTIONS.filter(k => !['interval', 'exclu
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
 export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'alignment', 'barSpacing'];
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'alignment', ..._GRAPH_BLOCK_NAMES, 'barSpacing'];
 
 // The options the card sets for its curves and its graphs — every curve's (CURVE_OPTION_KEYS,
 // and those copied onto a curve with them: card-graphs.js _levelFields), every graph's

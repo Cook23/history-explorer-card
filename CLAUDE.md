@@ -588,6 +588,19 @@ and any one to come):
   Chrome (Home Assistant's frame and the card's title shown) —, then appears all at once; the
   data isn't downloaded again (the cache kept).
 
+## Time — set by the user, not negotiable
+
+- **Timestamps are in UTC**, and UTC is kept everywhere, up to as close to the display as
+  possible: the local time (and its summer / winter jumps) only where it is shown.
+- **Home Assistant is the source of truth for the time**, but its time can jump forward or
+  backward (an NTP update, for example). Such a jump is handled as well as possible; holes (its
+  time jumping forward) and overwritten data (its time jumping backward) are accepted.
+- A hole shown is not a problem. A jump backward must not give an ugly display: the end of the
+  data is overwritten — the samples after the new one's time dropped, the new one kept —, with
+  an error logged in the console when more than one sample is dropped. A jump backward should
+  be a few hundred ms at most: only the last sample should be overwritten by the new one
+  received with a timestamp that jumped back.
+
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,

@@ -13,7 +13,7 @@
 //               what they give it
 
 import { OPTION_DEFAULTS, ENTITY_ONLY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS, CURVE_GRAPH_KEYS,
-         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText, INDIRECT_OPTIONS } from "./history-options.js";
+         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText, INDIRECT_OPTIONS, GRAPH_BLOCK_KEYS } from "./history-options.js";
 import { LOCAL_ONLY_FIELDS } from "./card-storage.js";
 import { seriesOf } from "./history-series.js";
 import { NO_FILL, indirectYaml } from "./history-default-colors.js";
@@ -47,6 +47,15 @@ const _intervalName = code => BAR_INTERVALS.find(i => i.code === code)?.yaml ?? 
 // (a fill's value as the YAML writes it: light for true)
 // (option k's value v as the YAML writes it: a bar interval by its name, a soft bound with its
 // '~', a value read indirectly — thresholds, a series — as written: see indirectYaml)
+// (a graph's options kept under names of their own — cursorMode… — written in their block:
+// cursor.mode…, see GRAPH_BLOCK_KEYS; the card's, as its YAML writes them: its blocks)
+const _BLOCK_NAMES = new Set(Object.values(GRAPH_BLOCK_KEYS).flatMap(b => Object.values(b)));
+function _inBlocks(o)
+{
+    for( const [block, keys] of Object.entries(GRAPH_BLOCK_KEYS) )
+        for( const [k, name] of Object.entries(keys) ) if( o[name] !== undefined ) { o[block] = { ...( o[block] ?? {} ), [k]: o[name] }; delete o[name]; }
+    return o;
+}
 const _yamlValue = (k, v) => k === 'interval' ? _intervalName(v) : BOUND_OPTIONS.includes(k) ? boundText(v)
     : INDIRECT_OPTIONS.includes(k) && v !== undefined ? indirectYaml(v) : v;
 
@@ -83,7 +92,7 @@ export class CardYaml
         // its name and show_graph, written as that graph's)
         const _ownGraph = Array.isArray(x.raw.entities) ? ['name', 'showGraph'] : [];
         for( const k in _src ) {
-            if( CARD_APART.has(k) || _ownGraph.includes(k) ) continue;
+            if( CARD_APART.has(k) || _ownGraph.includes(k) || _BLOCK_NAMES.has(k) ) continue;
             const _base = x.full ? OPTION_DEFAULTS[k] : _plain(x.look[k]) ? { ...OPTION_DEFAULTS[k], ...x.look[k] } : x.look[k] ?? OPTION_DEFAULTS[k];
             const v = x.full && k in x.look ? _src[k] : _diff(_src[k], _base);
             if( v !== undefined ) o[k] = _yamlValue(k, v);
@@ -129,6 +138,7 @@ export class CardYaml
                 const v = _yamlValue(k, this._graphValue(x, g, k));
                 if( v !== undefined ) o[k] = v;
             }
+            _inBlocks(o);
             o.entities = this._curvesYaml(x, g, g.entities);
             return o;
         });
@@ -205,7 +215,7 @@ export class CardYaml
                 const _v = _yamlValue(k, v);
                 if( _v !== undefined ) o[k] = _v;
             }
-            return o;
+            return _inBlocks(o);
         });
     }
 }

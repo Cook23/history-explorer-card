@@ -86,8 +86,6 @@ export class CardConfig
 
         P.labelAreaWidth =         c.labelAreaWidth ?? D.labelAreaWidth;
         P.labelsVisible =          c.labelsVisible ?? D.labelsVisible;
-        P.cursorMode =             c.cursor?.mode ?? d('cursorMode', D.cursor.mode);
-        P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', D.cursor.types);
         P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? D.tooltip.showColorsLine;
         P.showTooltipColors[1] =   c.tooltip?.showColorsTimeline ?? D.tooltip.showColorsTimeline;
         P.tooltipSize =            c.tooltip?.size ?? D.tooltip.size;
@@ -236,7 +234,7 @@ export class CardConfig
         return this.resolveOption(e, 'interpolation');
     }
 
-    // The tooltip's mode of entity e from fields (card-charts.js tooltipFields): its room's
+    // The tooltip's behavior of entity e from fields (card-charts.js tooltipFields): its room's
     // option (fields.chart) when set — the more precise —, else its screen's (fields.screen);
     // each its own, else its graph's, its entityOptions', the card's, else (the screen's only)
     // its default (resolveOption)
@@ -245,7 +243,7 @@ export class CardConfig
         return this.resolveOption(e, fields.chart) ?? this.resolveOption(e, fields.screen);
     }
 
-    // The option giving entity e's tooltip mode from fields (resolveTooltipOption): its room's
+    // The option giving entity e's tooltip behavior from fields (resolveTooltipOption): its room's
     // when set at any level, else its screen's — the one a menu choice changes
     tooltipFieldOf(e, fields)
     {

@@ -682,6 +682,39 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The cursor line at the same time, the graph's own (as its alignment), the tooltips across graphs ──
+    // (each graph's line: its time, the pixel it draws it at; its tooltip open)
+    const cursorState = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>{ const c=g.chart, l=c._hecCursorLine, s=c.scales['x-axis-0'];
+        return { draw: !!l?.draw, t: l?.t ?? null, x: l?.draw ? Math.round(s.getPixelForOffset(l.t)) : null, left: Math.round(c.chartArea.left), tip: (c.tooltip?._active?.length ?? 0) > 0 }; })`);
+    t = await openCard(card({ statistics: { enabled: false }, cursor: { mode: 'all', types: ['all'] }, graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] } ] }), { height: 1200, mock: { series: true } }); await t.wait(800);
+    await t.step('cursor all, plot areas of different sizes (a right Y axis on one, none on the others — alignment left): the line at the same time on every graph, at each one\'s own pixel for it', async () => {
+        await cursorDrawn(); const r = await cursorState();
+        const _right = await t.E(`el.instance.graphsInDisplayOrder().map(g=>Math.round(g.chart.chartArea.right))`);
+        return r.every(x => x.draw && x.t === r[0].t) && _right[0] !== _right[1] && r.some(x => x.x !== r[0].x || x.left !== r[0].left) ? true : JSON.stringify({ r, _right });
+    });
+    done(await t.close());
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [
+        { type: 'line', cursor: { mode: 'all', types: ['all'] }, entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a', cursor: { mode: 'all' } }] } ] }), { height: 1200, mock: { series: true } }); await t.wait(800);
+    await t.step('cursor.mode on a graph and on an entity (as its alignment): all on the first graph and on the timeline\'s entity — the line on both, not on the other (auto, the card\'s default: a line graph, not listed in cursor.types)', async () => {
+        const d = await cursorDrawn(); return d === '101' ? true : d;
+    });
+    done(await t.close());
+    t = await openCard(card({ statistics: { enabled: false }, cursor: { mode: 'all', types: ['all'] }, graphs: [
+        { type: 'line', tooltip: { mode: 'all' }, entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', tooltip: { mode: 'all' }, entities: [{ entity: 'sensor.tank' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] } ] }), { height: 1200, mock: { series: true } }); await t.wait(800);
+    await t.step('tooltip.mode all, with cursor.mode all: the pointer over the first graph, the second one\'s tooltip open at that time too — not the timeline\'s (tooltip.mode auto); the pointer gone, closed', async () => {
+        await cursorDrawn(); const r = await cursorState();
+        await t.page.mouse.move(2, 2); await t.wait(400); const after = await cursorState();
+        return r.every(x => x.draw) && r[1].tip && !r[2].tip && !after.some(x => x.draw) && !after[1].tip ? true : JSON.stringify({ r, after });
+    });
+    done(await t.close());
+
     // ── A legend too narrow for its labels: shortened, the value kept ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [
         { entity: 'sensor.power', name: 'Ecowitt Vitesse du vent (Filtered)' }, { entity: 'sensor.power2', name: 'Météo-France Villeveyrac Vitesse du vent' }] }] }),
@@ -1582,7 +1615,7 @@ module.exports = async function()
         const r = await tipAt('280px');
         return r.size === 'slim' && r.title === '' && /^\d\d?:\d\d(:\d\d)?(\s?[ap]m)?\u00a0\u00a0-?[\d.,]+ /i.test(r.label) && r.firstOnly ? true : JSON.stringify(r);
     });
-    await t.step('slim: one value only, whatever the tooltip mode (all) — a hover shows the first point alone', async () => {
+    await t.step('slim: one value only, whatever the tooltip behavior (all) — a hover shows the first point alone', async () => {
         const r = await t.E(`(()=>{ const c=graphAt(0).chart; c.data.datasets.forEach(d=>d.hecTooltip='all'); c.update(0);
             const m=c.getDatasetMeta(0).data, p=m[Math.floor(m.length/2)]._view, b=c.canvas.getBoundingClientRect();
             return c._hecHoverElements({ x:p.x, y:p.y }).length; })()`);

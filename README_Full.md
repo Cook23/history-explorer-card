@@ -603,31 +603,33 @@ Once open, the tooltip:
 - **Stands behind the move** — beside its point, on the side the pointer comes from when there is room (reaching a value moving rightward: on its left), decided when it shows a new value and kept while it stays on it; with a finger (no move to follow), on the side it comes from — from the value it showed before (tapping a value further right: on its left) —, for the first one on the side away from the graph's nearest edge; with no room on either side, above or below;
 - **Never moved by a drag** — a drag moves the curves, and an open tooltip with them.
 
-**Which values it shows** — each curve's tooltip mode, set by the screen or by the card's room:
+**Which values it shows** — each curve's tooltip behavior, set by the screen or by the card's room:
 - by the screen: `tooltip.largeScreen` in a window 640 px wide or more, `tooltip.smallScreen` in a narrower one — every card of the window alike, whatever its width;
 - by the card's room: `tooltip.largeChart` in a card 600 px wide or more, `tooltip.smallChart` in a narrower one and in the info panel. When set, it wins over the screen's; unset (the default), the screen's applies.
 
-Each is set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve), which sets the one giving each curve's mode where the card is: the card's room's when it's set (at any level), else the screen's — so, by default, a mode chosen from a menu follows the window's size. The last one to speak wins, kept on this device only:
+Each is set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve), which sets the one giving each curve's behavior where the card is: the card's room's when it's set (at any level), else the screen's — so, by default, a behavior chosen from a menu follows the window's size. The last one to speak wins, kept on this device only:
 - `selected` — the default on a small screen: the curves clicked; a hover alone shows the dot of the value nearest it, never the tooltip;
 - `nearest` — the value pointed at, on any curve, at a hover too, without a click;
 - `mixed` — the default on a large screen: that value and the curves clicked;
 - `all` — that value and, for each other curve of the graph, its value at the same time — or the nearest one, a few pixels away at most (each other row's or series' element, on timelines and bars).
 
-A click opens it in every mode — a finger has no hover. `tooltip.behavior` changes the default of `tooltip.largeScreen` and `tooltip.smallScreen` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs. `tooltip.largeChart` and `tooltip.smallChart` have no default. They can be set at the same levels:
+A click opens it whatever the behavior — a finger has no hover. `tooltip.behavior` changes the default of `tooltip.largeScreen` and `tooltip.smallScreen` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs. `tooltip.largeChart` and `tooltip.smallChart` have no default. They can be set at the same levels:
 
 ```yaml
 tooltip:
-  behavior: nearest      # every curve, on both screens, unless a screen's mode is set
+  behavior: nearest      # every curve, on both screens, unless a screen's behavior is set
   largeScreen: all       # on a large screen: all
   smallChart: selected   # in a narrow card and in the info panel: selected, whatever the screen
 ```
+
+**On the other graphs at once** — `tooltip.mode: all`, with `cursor.mode: all`: a graph's tooltip opened at the cursor line's time while the pointer is over another graph — see [The cursor line](#the-cursor-line).
 
 **Its size** — `tooltip.size`: every tooltip has the same layout, in one of three sizes:
 - `full`:
   - its title — where its first value comes from (`History`, or `Statistics` and their period: `5 min`, `1 h`) and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day);
   - then a line per value shown — its color box, its series' name and its value: a curve's or a bar's in its unit (`min / mean / max` for a column of values, its mean alone when the three are the same as shown — see [Data decimation](#data-decimation)), a timeline's state, an arrowline's value;
 - `compact` — its title is the time alone; then a line per value: its color box, its series' name at its shortest (as a narrow legend shortens it, see [Legend / entity labels](#legend--entity-labels)) and its value;
-- `slim` — no title; one value only, the one pointed at, whatever the mode, on one line: its color box, its time and its value. The time leaves out its date when the window shown is a single day, or when the time axis shows each day; a span over several days keeps its dates;
+- `slim` — no title; one value only, the one pointed at, whatever the behavior, on one line: its color box, its time and its value. The time leaves out its date when the window shown is a single day, or when the time axis shows each day; a span over several days keeps its dates;
 - `auto` (the default) — `full` on a card 600 px wide or more, `compact` from 300 px (and in the info panel), `slim` below.
 
 A timeline's graph is at least as high as its tooltip: 130 px in `full`, 115 in `compact`, 90 in `slim`.
@@ -1941,27 +1943,40 @@ uiColors:
 
 #### The cursor line
 
-While the pointer is over a graph's plot area (a mouse, or a pen held above the screen), a thin vertical line follows it: an easy way to read the time of a change, and to compare it across graphs. By default it's drawn on timelines only. `cursor` sets where:
+While the pointer is over a graph's plot area (a mouse, or a pen held above the screen), a thin vertical line follows it: an easy way to read the time of a change, and to compare it across graphs. By default it's drawn on timelines only. `cursor` sets where, and `tooltip.mode` whether the other graphs' tooltips open with it:
 
 ```yaml
 type: custom:history-explorer-card
 cursor:
   mode: auto          # auto (the default): on the graph under the pointer only
-                      # all: on every graph of the card at once, at the same time — to line events up
+                      # all: on every graph in all at once, at the same time — to line events up
                       # hide: never
-  types: [timeline]   # the graphs that show it, by type: timeline (the default), line, bar,
-                      # arrowline — or all
+  types: [timeline]   # the graphs it follows the pointer over, by type: timeline (the default),
+                      # line, bar, arrowline — or all
+tooltip:
+  mode: auto          # auto (the default): the tooltip of the graph under the pointer only
+                      # all: with cursor.mode all, this graph's tooltip opened at the line's time too
 uiColors:
   cursorLine: '#ff000080'   # its color (the grid lines' color by default)
 ```
 
-With `mode: all`, the line follows the pointer on every graph of the card as soon as the pointer is over a graph whose type is listed in `types`. For example, to line up a heating timeline with the temperature curves:
+They are options of the graph, as its alignment: set on the card for every graph, on a graph, on an entity or in `entityOptions` for the graph the entity is in; the graph's own value wins. Each graph:
+- `cursor.mode: auto` — the line on it, while the pointer is over it, when its type is listed in `cursor.types`;
+- `cursor.mode: all` — the line on it and on every other graph in `all`, at the same time — each at its own place for that time, whatever its plot's width —, as soon as the pointer is over one of them whose type is listed in `cursor.types`; a graph whose type isn't listed shows the line, without the pointer over it starting it;
+- `cursor.mode: hide` — no line on it;
+- `tooltip.mode: all`, with `cursor.mode: all` — its tooltip opened at the line's time while the pointer is over another graph: each of its series' value at that time (as the tooltip's `all` behavior shows them), closed when the line goes.
+
+*Behavior ▸ Cursor ▸* of a graph's menu (or of the card's options menu, for every graph) sets them, for the graph whatever its type: None; Graph pointed at; All graphs; All graphs, with tooltips.
+
+For example, to line up a heating timeline with the temperature curves, their tooltips read at once:
 
 ```yaml
 type: custom:history-explorer-card
 cursor:
   mode: all
   types: [line, timeline]
+tooltip:
+  mode: all
 ```
 
 #### Changing the UI layout
@@ -2108,7 +2123,7 @@ What each variable obeys, for its persistence on this device and on every device
 | The magnifier's mode | `range` (either option) | `enableMultidevicePersistence: range` |
 | The graphs' order, the linked graphs' too | `order` (either option) | `enableMultidevicePersistence: order` |
 | An entity's `type`, `color`, `fill`, `arrowLength`, `colorTransition`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width`, `sizePoints`, `yAxis` (its side, the *Behavior* menu's), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId` (its splits) | `entities` (either option) — a YAML entity: its own option first | `enableMultidevicePersistence: entities` — a YAML entity: its own `enableMultidevicePersistence` first |
-| A curve hidden (`hidden`), its points (`showPoints`), its tooltip modes, its graph's Y axes locked with their ranges (`yAxisLock`: the padlock, or a gesture on a Y axis) | `enablePersistence: entities` — a YAML entity: its own `enablePersistence` first | Never |
+| A curve hidden (`hidden`), its points (`showPoints`), its tooltip behaviors, its graph's Y axes locked with their ranges (`yAxisLock`: the padlock, or a gesture on a Y axis) | `enablePersistence: entities` — a YAML entity: its own `enablePersistence` first | Never |
 | The info panel's switch, the gesture thresholds | Always | Always |
 | The statistics export's period | Always | Never |
 | What the card worked out, to spare working it out again: the statistics probes' verdicts (a day), the automatic Y axes, the entity selector's widths and shorter lines | Always, until a new version of the card — let go then: the card's title reads "(new)" after its version, that first time only | Never |
@@ -2193,9 +2208,9 @@ graphs:
 Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)):
 - **Display** — `type`, `interval`, `name`, `unit`, `scale`, `siConversionFactor`, `process`, `netBars`, `circular`;
 - **Look** — `color`, `fill`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `sizePoints`, `showMinMax`, `hidden`;
-- **Axes and tooltip** — `yAxis`, `yAxisLock` (its graph's Y axes locked, with their ranges), `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes);
+- **Axes and tooltip** — `yAxis`, `yAxisLock` (its graph's Y axes locked, with their ranges), `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip behaviors);
 - **Layout** — `groupId`.
-- **Never synced** — `hidden`, `showPoints`, the tooltip modes and `yAxisLock`: only `enablePersistence` keeps them, on this device;
+- **Never synced** — `hidden`, `showPoints`, the tooltip behaviors and `yAxisLock`: only `enablePersistence` keeps them, on this device;
 - **`groupId`** — also covers how a YAML graph was split into linked graphs (double-click); their order within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. The entities added from the card have no YAML entry to attach it to — they're governed entirely by the card-level `enablePersistence`/`enableMultidevicePersistence` (which default to `all` for a card without YAML graphs, see above).
@@ -2289,7 +2304,7 @@ What a curve keeps:
 
 **The graph's own options**, set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins:
 - **Y axes** — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `yScaleSteadiness`, `yScaleSteadinessRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `alignment`, `yLabels`;
-- **The graph** — `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`;
+- **The graph** — `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`, `cursor.mode`, `cursor.types`, `tooltip.mode`;
 - **`height` on the card** — the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
 How options are read:
@@ -2455,11 +2470,12 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 
 | Option | Description |
 |---|---|
-| **`tooltip.largeScreen`**<br>*`largeScreenTooltip`, `large_screen_tooltip`* | **Default** `mixed`<br>The tooltip's mode on a screen 640 px wide or more: `mixed`, the value pointed at and the curves clicked; `nearest`, the value pointed at only; `selected`, the curves clicked only; `all`, every curve's value at that time. `tooltip.largeChart` or `tooltip.smallChart` wins when set — see [Tooltip](#tooltip) |
-| **`tooltip.smallScreen`**<br>*`smallScreenTooltip`, `small_screen_tooltip`* | **Default** `selected`<br>The tooltip's mode on a screen narrower than 640 px: `mixed`, `nearest`, `selected` or `all`. `tooltip.largeChart` or `tooltip.smallChart` wins when set — see [Tooltip](#tooltip) |
-| **`tooltip.largeChart`**<br>*`largeChartTooltip`, `large_chart_tooltip`* | **Default** not set: the screen's mode applies (`tooltip.largeScreen`, `tooltip.smallScreen`)<br>The tooltip's mode in a card 600 px wide or more, whatever the screen: `mixed`, `nearest`, `selected` or `all`. *Behavior ▸ Tooltip ▸* changes it in such a card once it is set — see [Tooltip](#tooltip) |
-| **`tooltip.smallChart`**<br>*`smallChartTooltip`, `small_chart_tooltip`* | **Default** not set: the screen's mode applies (`tooltip.largeScreen`, `tooltip.smallScreen`)<br>The tooltip's mode in a card narrower than 600 px, and in the info panel, whatever the screen: `mixed`, `nearest`, `selected` or `all`. *Behavior ▸ Tooltip ▸* changes it in such a card once it is set — see [Tooltip](#tooltip) |
+| **`tooltip.largeScreen`**<br>*`largeScreenTooltip`, `large_screen_tooltip`* | **Default** `mixed`<br>The tooltip's behavior on a screen 640 px wide or more: `mixed`, the value pointed at and the curves clicked; `nearest`, the value pointed at only; `selected`, the curves clicked only; `all`, every curve's value at that time. `tooltip.largeChart` or `tooltip.smallChart` wins when set — see [Tooltip](#tooltip) |
+| **`tooltip.smallScreen`**<br>*`smallScreenTooltip`, `small_screen_tooltip`* | **Default** `selected`<br>The tooltip's behavior on a screen narrower than 640 px: `mixed`, `nearest`, `selected` or `all`. `tooltip.largeChart` or `tooltip.smallChart` wins when set — see [Tooltip](#tooltip) |
+| **`tooltip.largeChart`**<br>*`largeChartTooltip`, `large_chart_tooltip`* | **Default** not set: the screen's behavior applies (`tooltip.largeScreen`, `tooltip.smallScreen`)<br>The tooltip's behavior in a card 600 px wide or more, whatever the screen: `mixed`, `nearest`, `selected` or `all`. *Behavior ▸ Tooltip ▸* changes it in such a card once it is set — see [Tooltip](#tooltip) |
+| **`tooltip.smallChart`**<br>*`smallChartTooltip`, `small_chart_tooltip`* | **Default** not set: the screen's behavior applies (`tooltip.largeScreen`, `tooltip.smallScreen`)<br>The tooltip's behavior in a card narrower than 600 px, and in the info panel, whatever the screen: `mixed`, `nearest`, `selected` or `all`. *Behavior ▸ Tooltip ▸* changes it in such a card once it is set — see [Tooltip](#tooltip) |
 | **`tooltip.behavior`**<br>*`tooltipBehavior`, `tooltip_behavior`* | **Default** `auto`<br>Sets `tooltip.largeScreen` and `tooltip.smallScreen` at once: `mixed`, `nearest`, `selected` or `all`. `auto` keeps their own defaults (`mixed` on a large screen, `selected` on a small one) — see [Tooltip](#tooltip) |
+| **`tooltip.mode`** | **Default** `auto`<br>`all`: with `cursor.mode: all`, the graph's tooltip opened at the cursor line's time while the pointer is over another graph; `auto`: only on the graph pointed at — see [The cursor line](#the-cursor-line) |
 | **`tooltip.size`**<br>*`tooltipSize`* | **Default** `auto`<br>How much every tooltip shows: `full`, the source and the time, then each name and value; `compact`, the time, then each shortest name and value; `slim`, one line; `auto`, by the card's width — full from 600 px, compact from 300 px and in the info panel, slim below — see [Tooltip](#tooltip) — *the card's only* |
 | **`tooltip.showLabel`** | **Default** `true`<br>`false`: the tooltip shows the values without the curves' names — see [Tooltip](#tooltip) — *the card's only* |
 | **`tooltip.showDuration`**<br>*`tooltipShowDuration`* | **Default** `false`<br>`true`: a timeline's or arrowline's tooltip shows how long the state lasted, after its time span — see [Tooltip](#tooltip) — *the card's only* |
@@ -2514,8 +2530,8 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`uiColors.buttons`** | **Default** the theme's primary color, light<br>The color of the toolbar's buttons — see [Customizing the color of UI elements](#customizing-the-color-of-ui-elements) — *the card's only* |
 | **`uiColors.selector`** | **Default** the card's background<br>The background of the entity selector's field — see [Customizing the color of UI elements](#customizing-the-color-of-ui-elements) — *the card's only* |
 | **`uiColors.closeButton`** | **Default** `#0000001f`<br>The background of the bar graphs' interval selector — see [Customizing the color of UI elements](#customizing-the-color-of-ui-elements) — *the card's only* |
-| **`cursor.mode`** | **Default** `auto`<br>The cursor line, the vertical line following the pointer: on the graph pointed at (`auto`), on every graph at once (`all`), or none (`hide`) — see [The cursor line](#the-cursor-line) — *the card's only* |
-| **`cursor.types`** | **Default** `[timeline]`<br>The graph types showing the cursor line: `line`, `bar`, `timeline`, `arrowline`, or `all` — see [The cursor line](#the-cursor-line) — *the card's only* |
+| **`cursor.mode`** | **Default** `auto`<br>The cursor line, the vertical line following the pointer: on the graph pointed at (`auto`), on every graph in `all` at once, at the same time (`all`), or none (`hide`) — see [The cursor line](#the-cursor-line) |
+| **`cursor.types`** | **Default** `[timeline]`<br>The graph types the cursor line follows the pointer over: `line`, `bar`, `timeline`, `arrowline`, or `all` — see [The cursor line](#the-cursor-line) |
 | **`timeTicks.density`**<br>*`timeTickDensity`* | **Default** `high`<br>The time labels' highest density: `low`, `medium`, `high`, `higher` or `highest` — fewer where the card is too narrow for them to fit side by side — see [Changing the horizontal time tick density](#changing-the-horizontal-time-tick-density) — *the card's only* |
 | **`timeTicks.densityOverride`** | **Default** not set<br>The time labels' density, whatever the card's width: `low`, `medium`, `high`, `higher` or `highest` — unlike `timeTicks.density`, never lowered — see [Changing the horizontal time tick density](#changing-the-horizontal-time-tick-density) — *the card's only* |
 | **`timeTicks.dateFormat`** | **Default** `normal`<br>`short`: the dates under the graphs written in short form — see [Changing the horizontal time tick density](#changing-the-horizontal-time-tick-density) — *the card's only* |

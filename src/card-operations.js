@@ -487,6 +487,16 @@ export class CardOperations
         this.writeLocalState();
     }
 
+    // Graph g's cursor line and tooltips across graphs (options: cursorMode, cursorTypes,
+    // tooltipMode — see cursorLineOf) set on each of its entities, as its alignment — saved
+    // so, the graph rebuilt in its place
+    setGraphCursor(g, options)
+    {
+        for( const e of g.entities ) Object.assign(e, options);
+        this.rebuildInPlace(g);
+        this.writeLocalState();
+    }
+
     // The samples' dots of the curves among entities of graph g all shown (showPoints: true)
     // — back to the hovered one only (hover) when they all are (a long-press: none, false, only
     // from the Points submenu)
@@ -496,20 +506,20 @@ export class CardOperations
         if( _curves.length ) this.setCurvesLook(g, _curves, 'showPoints', _curves.every(e => allPointsShown(this.resolveOption(e, 'showPoints'))) ? 'hover' : true);
     }
 
-    // The tooltip's mode of the curves among entities of graph g (see tooltipModeOf) — for
-    // where the card is now, in the option giving each one's mode (tooltipFieldOf): its
+    // The tooltip's behavior of the curves among entities of graph g (see tooltipBehaviorOf) — for
+    // where the card is now, in the option giving each one's behavior (tooltipFieldOf): its
     // room's when set, else its screen's; saved so, on this device only
-    setCurvesTooltip(g, entities, mode)
+    setCurvesTooltip(g, entities, behavior)
     {
         const _f = this.tooltipFields();
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
-        for( const e of _curves ) e[this.tooltipFieldOf(e, _f)] = mode;
-        this.applyTooltipModes(g);
+        for( const e of _curves ) e[this.tooltipFieldOf(e, _f)] = behavior;
+        this.applyTooltipBehaviors(g);
         this.writeLocalState();
     }
 
     // The statistics export menu's period set — chosen there (save: kept on this device, as a
-    // curve's tooltip mode) or restored (card-storage.js); null, or one it doesn't offer: the
+    // curve's tooltip behavior) or restored (card-storage.js); null, or one it doesn't offer: the
     // YAML's
     setExportStatsPeriod(period, save = true)
     {

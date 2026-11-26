@@ -31,7 +31,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 - **v1.2.88** — An arrowline's extremes: the spread of the direction around each arrow.
 - **v1.2.77** — YAML export; optimization stage end (up to 50× faster).
-- **v1.2.40** — Tooltip modes by screen size: selected curves, nearest, mixed or all.
+- **v1.2.40** — Tooltip behaviors by screen size: selected curves, nearest, mixed or all.
 - **v1.2.37** — A curve's appearance chosen in its menu: color, points, width, line style.
 - **v1.2.21** — The calendar: a day chosen to show.
 - **v1.2.18** — mini-graph-card's YAML read as is.
@@ -597,11 +597,14 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`tooltip.largeChart`**<br>*`largeChartTooltip`, `large_chart_tooltip`* | **Default** not set: the screen's tooltip<br>The tooltip in a card 600 px wide or more, instead of the screen's: `mixed`, `nearest`, `selected`, `all` |
 | **`tooltip.smallChart`**<br>*`smallChartTooltip`, `small_chart_tooltip`* | **Default** not set: the screen's tooltip<br>The tooltip in a card narrower than 600 px, instead of the screen's: `mixed`, `nearest`, `selected`, `all` |
 | **`tooltip.behavior`**<br>*`tooltipBehavior`, `tooltip_behavior`* | **Default** `auto`<br>`tooltip.largeScreen` and `tooltip.smallScreen` set at once; `auto` keeps theirs |
+| **`tooltip.mode`** | **Default** `auto`<br>`all`: with `cursor.mode: all`, the graph's tooltip opened at the cursor line's time, the pointer over another graph — see *1 |
 | **`tooltip.size`**<br>*`tooltipSize`* | **Default** `auto`<br>How much a tooltip shows: `full`, `compact`, `slim`, `auto` (by the card's width) — *the card's only* |
 | **`tooltip.showLabel`** | **Default** `true`<br>`false`: no curve name before its value in the tooltip — *the card's only* |
 | **`tooltip.showDuration`**<br>*`tooltipShowDuration`* | **Default** `false`<br>`true`: a timeline's or arrowline's tooltip shows how long the state lasted — *the card's only* |
 | **`tooltip.showColorsLine` / `tooltip.showColorsTimeline`**<br>*`showTooltipColorsLine` / `showTooltipColorsTimeline`* | **Default** `true`<br>`false`: no color boxes in the tooltips of line and bar graphs / of timelines — *the card's only* |
 | **`tooltip.stateTextMode`** | **Default** `stateTextMode`'s<br>The states' names in the tooltip: `auto`, `raw`, `hide` — *the card's only* |
+
+*1 — an option of the graph itself (its tooltip opened from another graph): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
 
 ### Data options
 
@@ -653,8 +656,8 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`uiColors.buttons`** | **Default** the theme's primary color, light<br>The buttons' color — *the card's only* |
 | **`uiColors.selector`** | **Default** the card's background<br>The entity selector's background — *the card's only* |
 | **`uiColors.closeButton`** | **Default** `#0000001f`<br>The bar interval selector's background — *the card's only* |
-| **`cursor.mode`** | **Default** `auto`<br>The cursor line: on the graph pointed at (`auto`), every graph (`all`), none (`hide`) — *the card's only* |
-| **`cursor.types`** | **Default** `[timeline]`<br>The graph types showing the cursor line — *the card's only* |
+| **`cursor.mode`** | **Default** `auto`<br>The cursor line: on the graph pointed at (`auto`), on every graph in `all` at once (`all`), none (`hide`) — see *2 |
+| **`cursor.types`** | **Default** `[timeline]`<br>The graph types the cursor line follows the pointer over, `all` for every type — see *2 |
 | **`timeTicks.density`**<br>*`timeTickDensity`* | **Default** `high`<br>How many time labels: `low`, `medium`, `high`, `higher`, `highest` — *the card's only* |
 | **`timeTicks.densityOverride`** | **Default** not set<br>The time labels' density whatever the card's width: `low` … `highest` — *the card's only* |
 | **`timeTicks.dateFormat`** | **Default** `normal`<br>`short`: shorter dates under the graphs — *the card's only* |
@@ -662,6 +665,8 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`infoPanel`** | **Default** not set<br>The info panel's own options, as the card's — *the card's only* |
 
 *1 — `height` on the card: the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` win over it.
+
+*2 — an option of the graph itself (its cursor line): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
 
 ### CSV export options
 

@@ -514,38 +514,57 @@
     } });
 
   // ---------------------------------------------------------------------------
-  // Cursor line — options.plugins.hecCursorLine { show, shared, color }: while the
-  // pointer is over the plot area of a chart whose show is true, a vertical line under it
-  // — on that chart, or with shared on every chart of its dragScope, at the same x
+  // Cursor line — options.plugins.hecCursorLine { show, shared, tooltips, color }: while the
+  // pointer is over the plot area of a chart whose show is true, a vertical line at the time
+  // under it — on that chart, or when its shared is true on every chart of its dragScope whose
+  // shared is true, at that same time: each at its own time axis' pixel for it, wherever its
+  // plot is (charts aligned or not); on those of them whose tooltips is true, the tooltip at
+  // that time too (hecShowTooltipAt), closed when the line goes
+  // (a chart's time axis: its horizontal time scale)
+  var _hecTimeScale = function (c) {
+    for (var _id in c.scales) { var _s = c.scales[_id]; if (_s.isHorizontal() && typeof _s.getPixelForOffset === 'function') return _s; }
+    return null;
+  };
+  var _hecCursorOpts = function (c) { return (c.options.plugins && c.options.plugins.hecCursorLine) || {}; };
   Chart.plugins.register({
     id: 'hecCursorLine',
     afterInit: function (chart) {
-      chart._hecCursorLine = { x: 0, draw: false };
+      chart._hecCursorLine = { t: null, draw: false };
     },
     afterEvent: function (chart, evt, opts) {
       if (!opts || !opts.show) return;
-      var _a = chart.chartArea;
-      var _line = { x: evt.x, draw: evt.x >= _a.left && evt.x <= _a.right && evt.y >= _a.top && evt.y <= _a.bottom };
+      var _a = chart.chartArea, _ts = _hecTimeScale(chart);
+      var _in = evt.x >= _a.left && evt.x <= _a.right && evt.y >= _a.top && evt.y <= _a.bottom;
+      var _line = { t: _in && _ts ? +_ts.getValueForPixel(evt.x) : null, draw: _in && !!_ts };
       var _charts = [chart];
       if (opts.shared && Chart.instances) {
-        _charts = [];
         for (var _cid in Chart.instances) {
           var _c = Chart.instances[_cid];
-          if (_c === chart || (_c.canvas && _c.options.dragScope === chart.options.dragScope)) _charts.push(_c);
+          if (_c !== chart && _c.canvas && _c.options.dragScope === chart.options.dragScope && _hecCursorOpts(_c).shared) _charts.push(_c);
         }
       }
-      _charts.forEach(function (c) { c._hecCursorLine = _line; c.draw(); });
+      _charts.forEach(function (c) {
+        var _was = c._hecCursorLine;
+        if (_was && _was.draw === _line.draw && _was.t === _line.t) return;
+        c._hecCursorLine = _line;
+        // (another chart's tooltip at that time — its own, the pointer over it, left alone)
+        if (c !== chart && _hecCursorOpts(c).tooltips) {
+          if (_line.draw) c.hecShowTooltipAt(_line.t); else if (c._hecTooltipAt) c.hecEndTooltip();
+        }
+        c.draw();
+      });
     },
     afterDatasetsDraw: function (chart, easing, opts) {
-      var _l = chart._hecCursorLine;
-      if (!_l || !_l.draw) return;
-      var ctx = chart.ctx, _a = chart.chartArea;
+      var _l = chart._hecCursorLine, _ts = _hecTimeScale(chart);
+      if (!_l || !_l.draw || _l.t === null || !_ts) return;
+      var ctx = chart.ctx, _a = chart.chartArea, _x = _ts.getPixelForOffset(_l.t);
+      if (!( _x >= _a.left && _x <= _a.right )) return;
       ctx.save();
       ctx.lineWidth = 1.0;
       ctx.strokeStyle = (opts && opts.color) || 'black';
       ctx.beginPath();
-      ctx.moveTo(_l.x, _a.bottom);
-      ctx.lineTo(_l.x, _a.top);
+      ctx.moveTo(_x, _a.bottom);
+      ctx.lineTo(_x, _a.top);
       ctx.stroke();
       ctx.restore();
     } });
@@ -3753,7 +3772,7 @@
     },
 
     // Whether a dataset shown — a curve, bars, a timeline's or an arrowline's row — opens its
-    // tooltip on a hover: its tooltip mode (hecTooltip) 'nearest', 'mixed' or 'all'
+    // tooltip on a hover: its tooltip behavior (hecTooltip) 'nearest', 'mixed' or 'all'
     _hecHasHoverTooltips: function () {
       var me = this;
       return (me.data.datasets || []).some(function (ds, i) {
@@ -3764,7 +3783,7 @@
     // The elements a tooltip shows at this point — a curve's points (values drawn, never its
     // path between them), bars, a timeline's or an arrowline's segments: every dataset alike.
     // The first: the element pointed at (_hecPointAt), among those of the datasets that can
-    // show it — each one's tooltip mode (the dataset option hecTooltip): 'nearest', 'mixed'
+    // show it — each one's tooltip behavior (the dataset option hecTooltip): 'nearest', 'mixed'
     // and 'all' ones, and those a click selected ('selected', 'mixed': the tooltip mode) —;
     // none: nothing shown. Then, on each other dataset that shows it — selected ('selected',
     // 'mixed'), or every one with 'all' —, its element at that one's time, within the
@@ -3845,10 +3864,34 @@
       this._hecTooltipCurves = null;
     },
 
+    // The tooltip opened at time t (ms) — the cursor line of another chart (hecCursorLine) —:
+    // each dataset shown, its element at that time (_hecElementAtTime: within the picking
+    // margin), the first one alone with tooltips.hecFirstOnly; none there: closed
+    hecShowTooltipAt: function (t) {
+      var me = this, _ts = _hecTimeScale(me);
+      if (!_ts || !me.tooltip) return;
+      var _x = _ts.getPixelForOffset(t), _els = [];
+      (me.data.datasets || []).forEach(function (ds, i) {
+        if (!me.isDatasetVisible(i)) return;
+        var el = me._hecElementAtTime(i, _x);
+        if (el) _els.push(el);
+      });
+      if (me.options.tooltips && me.options.tooltips.hecFirstOnly) _els = _els.slice(0, 1);
+      if (me.lastActive && me.lastActive.length) me.updateHoverStyle(me.lastActive, me.options.hover.mode, false);
+      if (_els.length) me.updateHoverStyle(_els, me.options.hover.mode, true);
+      me.active = _els;
+      me.lastActive = _els;
+      me._hecTooltipAt = _els.length > 0;
+      me.tooltip._active = _els;
+      me.tooltip.update(true, true);
+      me.tooltip.pivot();
+    },
+
     // The tooltip closed at once and its mode ended, the point it showed back to its normal
     // look, no hover dot — a menu opens over the card: nothing of the tooltip stays over it
     hecEndTooltip: function () {
       var me = this;
+      me._hecTooltipAt = false;
       me._hecEndTooltipMode();
       me._hecUpdateHoverDot(null);
       if (me.active && me.active.length) me.updateHoverStyle(me.active, me.options.hover.mode, false);
