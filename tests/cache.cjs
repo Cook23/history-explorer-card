@@ -137,5 +137,20 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The order of the requests: the window of the graphs on the screen whole first ──
+    t = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: true }, graphs: ['sensor.power', 'sensor.power2', 'sensor.tank', 'sensor.rain', 'sensor.gas', 'sensor.power_kw']
+        .map(entity => ({ type: 'line', entities: [{ entity }] })) }), { height: 700, mock: { series: true, historyDelay: 150 }, clock: '2026-11-20T12:00:00Z' });
+    await t.wait(1500);
+    await t.step('a load: every request of the window for the graphs on the screen (phases 1 and 2) sent before any for the graphs off the screen — what\'s shown complete first', async () => {
+        const r = await t.E(`(async()=>{ const I = el.instance, n0 = __ws.length;
+            I.reloadHistory(); await new Promise(r => setTimeout(r, 100));
+            for( let k = 0; k < 120 && ( I.state.loading || I._requests.length ); k++ ) await new Promise(r => setTimeout(r, 250));
+            const shown = I.shownSeries(), t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime);
+            const l = __ws.slice(n0).filter(w => w.ids && w.start && Date.parse(w.start) < t1 && Date.parse(w.end ?? new Date().toISOString()) > t0).map(w => w.ids.some(id => shown.has(id)) ? 'S' : 'o');
+            return { shown: [...shown].join(), order: l.join('') }; })()`);
+        return r.shown && /^S+o+$/.test(r.order) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

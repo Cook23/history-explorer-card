@@ -4,8 +4,9 @@
 // its recorder's workers, 4 with MariaDB; it answers them in the order they come, and a
 // request sent can't be taken back)
 //
-// - Sent in the order asked — by their order (o.order: a phase, a block, then the place of its entity
-//   in the graphs), then as asked —, at once, no delay between them, HA_WORKERS in flight at
+// - Sent in the order asked — by their order (o.order: what's on the screen, a phase, a block, then
+//   the place of its entity in the graphs), then as asked —, those asked together (in the same
+//   task: a window's) all queued before the first is sent, no delay between them, HA_WORKERS in flight at
 //   most: each of Home Assistant's workers busy, none waiting there — a new window's
 //   requests never behind a long queue there. A fixed count, nothing measured: requests of
 //   sizes that different (an hour of a sensor, ten years of several) tell nothing of Home
@@ -38,7 +39,9 @@ class Regulator
             // (after those of its order or a lower one: as asked within it)
             const k = this.queue.findIndex(x => x.order > job.order);
             this.queue.splice(k < 0 ? this.queue.length : k, 0, job);
-            this._pump();
+            // (sent once what's asked together is queued: the requests a card asks at once —
+            // a window's — in their order, never the first asked first)
+            if( !this._pumping ) { this._pumping = true; queueMicrotask(() => { this._pumping = false; this._pump(); }); }
         });
     }
 
