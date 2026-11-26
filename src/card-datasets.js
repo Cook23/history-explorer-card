@@ -389,8 +389,8 @@ export class CardDatasets
     // The time entity e's rows are read over for graph g (see card-history.js cachedHistory):
     // the window widened to the whole groups at its edges, each worked out from all its
     // values — a column of pixels or an aggregation's group (_groupsOf), a bar's interval, an
-    // arrow's zone —; a timeline's, from a grid of the window's length (its narrow blocks
-    // merged from there: the same while the window moves within it) → [from, to] (ms)
+    // arrow's zone —; a timeline's, from its column's start (its narrow blocks merged from
+    // there: the same while the window moves within a column) → [from, to] (ms)
     rowsSpan(g, e)
     {
         const t0 = msOf(this.startTime), t1 = msOf(this.endTime), r = Math.max(1, t1 - t0), px = Math.max(1, g.chart.hecPlotWidth());
@@ -401,7 +401,9 @@ export class CardDatasets
             return [moment(t0).startOf(I.start).valueOf(), moment(t1).add(td).add(td).valueOf()];
         }
         if( _kind === 'arrowline' ) { const Z = ARROW_SPACING_PX * r / px; return [Math.floor(t0 / Z) * Z, ( Math.floor(t1 / Z) + 1 ) * Z]; }
-        return [Math.floor(t0 / r) * r, t1];
+        // (a timeline: its narrow blocks merged from a column of pixels' start — see _timelineRows)
+        const C = r / px;
+        return [Math.floor(t0 / C) * C, t1];
     }
 
     // Is series id drawn from all the cache knows of it (knownHistory) — a curve in smart mode,

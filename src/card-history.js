@@ -2,9 +2,9 @@
 // long-term statistics), filled on demand for the time window shown, and the user's own
 // state process function. Part of HistoryCardState (added to it in history-explorer-card.js).
 
-import { optionSeriesIdsOf } from "./card-datasets.js";
+import { optionSeriesIdsOf, optionSeriesOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
-import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS, configWarning } from "./history-options.js";
+import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS, INDIRECT_OPTIONS, configWarning } from "./history-options.js";
 import { HORIZON } from "./card-yscale.js";
 import { perf, REDRAW_CAUSES } from "./card-perf.js";
 import { haRequests, HA_WORKERS } from "./ha-requests.js";
@@ -236,8 +236,15 @@ const CACHE_MAX_ROWS = 500000;
 // of this device's steady one (performance.now: never set) at least: the most it told, kept —
 // Home Assistant's now never told earlier than it was before
 const HA_CLOCK_SCAN_MS = 5000;
-// (this device's steady clock, ms — on the same scale as Date.now when the page opened)
+// (this device's steady clock, ms — on the same scale as Date.now when the page opened —: every
+// time this device measures — how long since, how long until — never its clock, which may be set)
 const steadyNow = () => performance.timeOrigin + performance.now();
+// What the page knows of its Home Assistant — one for every card of the page, whatever cache
+// each has (a card made again shares its cache, see PAGE_CACHES): how far its clock is ahead of
+// this device's steady one at least (ahead — see _noteHaTime), when its states were last looked
+// at for it (scanned), and how far it was seen to have compiled its statistics, 5-minute and
+// hourly (compiled, by compiledOf — see _answered)
+const HA_KNOWN = { ahead: undefined, scanned: -Infinity, compiled: new Map() };
 // How late Home Assistant may be with a period's statistics: it compiles them once the
 // period has ended (within seconds — room left for it being slow)
 const STATS_LAG = 10 * 60e3;
@@ -290,15 +297,15 @@ export class CardHistory
     // A time Home Assistant gave (ms): its clock at that time at least (see HA_CLOCK_SCAN_MS)
     _noteHaTime(t)
     {
-        if( Number.isFinite(t) ) this._haAhead = Math.max(this._haAhead ?? -Infinity, t - steadyNow());
+        if( Number.isFinite(t) ) HA_KNOWN.ahead = Math.max(HA_KNOWN.ahead ?? -Infinity, t - steadyNow());
     }
 
     // The states Home Assistant gives (hass): their newest last update (see _noteHaTime)
     noteHaClock(hass)
     {
         const _now = steadyNow();
-        if( _now - ( this._clockScan ?? -Infinity ) < HA_CLOCK_SCAN_MS ) return;
-        this._clockScan = _now;
+        if( _now - HA_KNOWN.scanned < HA_CLOCK_SCAN_MS ) return;
+        HA_KNOWN.scanned = _now;
         let lu = -Infinity;
         for( const st of Object.values(hass?.states ?? {}) ) { const t = Date.parse(st?.last_updated); if( t > lu ) lu = t; }
         this._noteHaTime(lu);
@@ -309,7 +316,7 @@ export class CardHistory
     // this device's, until Home Assistant has given a time
     _haNow()
     {
-        return this._haAhead !== undefined ? steadyNow() + this._haAhead : Date.now();
+        return HA_KNOWN.ahead !== undefined ? steadyNow() + HA_KNOWN.ahead : Date.now();
     }
 
     // How far Home Assistant may have values (ms): the later of this device's now and Home
@@ -470,6 +477,28 @@ export class CardHistory
         return this.statistics.force && S[1] ? S[1].kind : 'history';
     }
 
+    // What the window reads (ms) — and so what's asked for it (_askMissing): each curve's time
+    // (rowsSpan: the window and the whole groups at its edges), by graph, in its order
+    // (curves); each series an option reads (series): over the time of the curves it's read
+    // for — a color, a fill —, and for an arrow's length the time around the window its scale
+    // looks at too (yScaleRange: as an automatic Y axis); all of them together (all: [from, to])
+    readSpans()
+    {
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), Y = this.yScaleRange(), curves = new Map(), series = new Map();
+        let A = t0, B = t1;
+        const _widen = (id, a, b) => { const x = series.get(id); series.set(id, x ? [Math.min(x[0], a), Math.max(x[1], b)] : [a, b]); };
+        for( const g of this.graphs ) curves.set(g, g.entities.map(e => {
+            const [a, b] = this.rowsSpan(g, e);
+            A = Math.min(A, a); B = Math.max(B, b);
+            for( const k of INDIRECT_OPTIONS ) {
+                const id = optionSeriesOf(e, k);
+                if( id ) _widen(id, k === 'arrowLength' && Y ? Math.min(a, Y[0]) : a, k === 'arrowLength' && Y ? Math.max(b, Y[1]) : b);
+            }
+            return [a, b];
+        }));
+        return { curves, series, all: [A, B] };
+    }
+
     // An entity's rows from T0 to T1 (ms), with the one before T0 — when nothing between them
     // was never asked: the value in force at T0 (no interpolation issue at the start of a
     // curve, no state disappearing at the start of a timeline) — and the one after T1: the
@@ -561,9 +590,10 @@ export class CardHistory
             // out, its place kept)
             const _tc = performance.now();
             const _layers = this._drawLayers(this._statisticsIds());
-            for( const g of this.graphs ) for( const e of g.entities ) result.push(!_graphs || _graphs.includes(g) ? this.cachedHistory(e.entity, ...this.rowsSpan(g, e), _layers.get(e.entity)) : null);
+            const R = this.readSpans();
+            for( const g of this.graphs ) g.entities.forEach((e, j) => result.push(!_graphs || _graphs.includes(g) ? this.cachedHistory(e.entity, ...R.curves.get(g)[j], _layers.get(e.entity)) : null));
             const colorHistory = {};
-            for( const id of this.optionSeriesIds() ) colorHistory[id] = this.cachedHistory(id, t0, t1, _layers.get(id));
+            for( const [id, span] of R.series ) colorHistory[id] = this.cachedHistory(id, ...span, _layers.get(id));
             // (timed while the performance test records: the rows read from the cache)
             perf.add('from cache', performance.now() - _tc);
             this.buildChartData(result, colorHistory, _graphs);
@@ -848,7 +878,7 @@ export class CardHistory
     // may bring the same hours later)
     _speaks(rows, t, gap)
     {
-        const _now = Date.now();
+        const _now = this.askNow();
         let n = 0, short = 0, shortest = null, prev = null;
         for( const x of rows ?? [] ) {
             const v = x.lu * 1000;
@@ -1089,7 +1119,7 @@ export class CardHistory
         const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _now = this.askNow(), G = this._geometry(), r = G.r;
         // (a new window, or new curves: the background no sooner than AHEAD_GAP_MS after it — a gesture going on)
         const _key = [this.startTime, this.endTime, ...this.historyEntityIds()].join();
-        if( _key !== this._aheadKey ) { this._aheadKey = _key; this._backgroundNext = Math.max(this._backgroundNext ?? 0, Date.now() + AHEAD_GAP_MS); }
+        if( _key !== this._aheadKey ) { this._aheadKey = _key; this._backgroundNext = Math.max(this._backgroundNext ?? 0, steadyNow() + AHEAD_GAP_MS); }
 
         // (the cache grown, a year at a time, as far as the background fills it: HORIZON
         // windows before the window — 10 years at most, see growCache)
@@ -1155,7 +1185,9 @@ export class CardHistory
         const _bySource = new Map();
         for( const p of plans.values() ) if( p.p2 ) { if( !_bySource.has(p.p2.kind) ) _bySource.set(p.p2.kind, []); _bySource.get(p.p2.kind).push(p); }
         const _series = (kind, l) => l.flatMap(p => kind === 'history' ? p.u : [p.u[0]]);
-        this._blocks(t0, Math.min(t1, _now), _size).forEach(([a, b], k) => {
+        // (over what the window reads: its curves' groups at its edges — see readSpans)
+        const [R0, R1] = this.readSpans().all;
+        this._blocks(R0, Math.min(R1, _now), _size).forEach(([a, b], k) => {
             for( const [kind, l] of _bySource ) for( const g of this._requestGroups(l.map(p => [p])) ) {
                 this._askGroup(kind, _series(kind, g), a, b, { phase: 2, rank: k });
                 const _empty = new Map(), _add = (f, ids) => { if( !_empty.has(f) ) _empty.set(f, []); appendAll(_empty.get(f), ids); };
@@ -1252,8 +1284,9 @@ export class CardHistory
             if( !_d.length ) continue;
             _d.sort((x, y) => y - x);
             // (kept: from A to B — the rows there, every span cut there; a row's time may hold a
-            // fraction of a ms, the history's)
-            const D = _d[Math.min(n - AHEAD_MAX_ROWS, _d.length) - 1], A = Z0 - D + 1, B = Z1 + D;
+            // fraction of a ms, the history's —, a row more for each series of the history: the
+            // state in force where it's cut, kept)
+            const D = _d[Math.min(n - AHEAD_MAX_ROWS + ( l === 'hist' ? this.cache.layers[l].size : 0 ), _d.length) - 1], A = Z0 - D + 1, B = Z1 + D;
             for( const tr of this.cache.layers[l].values() ) {
                 const k0 = rowIndex(tr.rows, A), k1 = rowIndex(tr.rows, B);
                 if( k0 === 0 && k1 === tr.rows.length ) continue;
@@ -1278,7 +1311,7 @@ export class CardHistory
     // the pause after the last one over? If not, the cache is looked at again once it is
     _backgroundFree()
     {
-        const _wait = ( this._backgroundNext ?? 0 ) - Date.now();
+        const _wait = ( this._backgroundNext ?? 0 ) - steadyNow();
         if( !this._requests.length && !haRequests.busy() && !this.state.drag && _wait <= 0 ) return true;
         clearTimeout(this._backgroundTid);
         this._backgroundTid = setTimeout(() => { this._backgroundTid = 0; if( !this._requests.length ) this._askMissing(); }, Math.min(AHEAD_GAP_MAX_MS, Math.max(_wait, AHEAD_GAP_MS)));
@@ -1532,8 +1565,8 @@ export class CardHistory
         a = Math.floor(a / 1000) * 1000; b = Math.ceil(b / 1000) * 1000;
         // (at: Home Assistant's now when it's sent, at least — see _haNow; compiled: how far it
         // was seen to have compiled the statistics it's made of, then — see _answered)
-        const _compiledNow = () => kind === 'history' ? null : this._compiled?.get(compiledOf(periodOfKind(kind, this.statistics.period))) ?? null;
-        const q = { kind, ids: new Set(ids), b0: a, b1: b, gen: this._loadGen, at: this._haNow(), sent: Date.now(), background: !!o.background, phase: o.phase, key: this._aheadKey, compiled: _compiledNow() };
+        const _compiledNow = () => kind === 'history' ? null : HA_KNOWN.compiled.get(compiledOf(periodOfKind(kind, this.statistics.period))) ?? null;
+        const q = { kind, ids: new Set(ids), b0: a, b1: b, gen: this._loadGen, at: this._haNow(), sent: steadyNow(), background: !!o.background, phase: o.phase, key: this._aheadKey, compiled: _compiledNow() };
         this._requests.push(q);
         // (what it will bring, by layer and entity: see _lacking)
         this._flying ??= new Map();
@@ -1547,7 +1580,7 @@ export class CardHistory
             const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _off + _at, stale: () => !this._serves(q),
                          info: { phase: o.phase ?? null, background: q.background },
                          // (sent: what it's known as of, and what was seen compiled, then)
-                         sent: () => { q.at = this._haNow(); q.sent = Date.now(); q.compiled = _compiledNow(); } };
+                         sent: () => { q.at = this._haNow(); q.sent = steadyNow(); q.compiled = _compiledNow(); } };
             _p = kind === 'history' ? this.historyCall(ids, moment(a), moment(b), _o)
                                     : this._askHA(this.statisticsRequest(ids, moment(a), moment(b), periodOfKind(kind, this.statistics.period)), _o);
         } catch( e ) {
@@ -1569,7 +1602,7 @@ export class CardHistory
             if( k >= 0 ) l.splice(k, 1);
         }
         // (a request in the background: the next one no sooner than twice what it took)
-        if( q.background ) this._backgroundNext = Date.now() + Math.min(AHEAD_GAP_MAX_MS, Math.max(AHEAD_GAP_MS, 2 * ( Date.now() - q.sent )));
+        if( q.background ) this._backgroundNext = steadyNow() + Math.min(AHEAD_GAP_MAX_MS, Math.max(AHEAD_GAP_MS, 2 * ( steadyNow() - q.sent )));
         try {
             // (an answer for a cache since cleared — reloadHistory —: ignored)
             if( q.gen !== this._loadGen || !this._cacheReady() ) return;
@@ -1614,7 +1647,7 @@ export class CardHistory
                 this._noteHaTime(_seen);
                 let upto = q.at, proof = q.at;
                 if( _name ) {
-                    if( _name === _c && _seen > ( this._compiled?.get(_c) ?? -Infinity ) ) ( this._compiled ??= new Map() ).set(_c, _seen);
+                    if( _name === _c && _seen > ( HA_KNOWN.compiled.get(_c) ?? -Infinity ) ) HA_KNOWN.compiled.set(_c, _seen);
                     proof = Math.max(q.compiled ?? -Infinity, _name === _c ? _seen : -Infinity, q.at - RECORDER_WRITE_MAX_MS);
                     upto = Math.max(q.b0, Math.min(q.b1, this._periodsOver(_name, proof, proof)[0]));
                 }
@@ -1791,7 +1824,6 @@ export class CardHistory
         this._requests = [];
         this._flying = new Map();
         this._histFrom = new Map();
-        this._compiled = new Map();
         this.state.loading = false;
         // (from nothing: a new cache, the page's cache of this card — never one another card of
         // the same name and YAML put there, see initCache)

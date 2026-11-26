@@ -7,6 +7,7 @@
 //   historyDays history kept that many days back (older: statistics only)
 //   fail        WS message types that fail
 //   language    Home Assistant's language ('en')
+//   timeZone    Home Assistant's time zone (its config's time_zone; none: not told)
 //   dark        dark theme
 //   historyDelay, userDataDelay   ms Home Assistant takes to answer for the history and the
 //               statistics, and for the user data (none: at once)
@@ -245,7 +246,7 @@ const mockConnection={ subscribeMessage:(cb,msg)=>{
   return Promise.resolve(()=>{}); } };
 function mkHass(){ return {
   connection: mockConnection,
-  states:{...Object.fromEntries(Object.keys(STATES).filter(id=>!(MOCK.absent||[]).includes(id)).map(id=>[id, inSeries(id) ? seriesState(id) : STATES[id]])), ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  states:{...Object.fromEntries(Object.keys(STATES).filter(id=>!(MOCK.absent||[]).includes(id)).map(id=>[id, inSeries(id) ? seriesState(id) : STATES[id]])), ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}, ...(MOCK.timeZone ? { time_zone:MOCK.timeZone } : {})}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   // (no translation: an empty string, as Home Assistant gives for a key it doesn't know)
   user:{id:'u1',name:'u'}, localize:()=>'',

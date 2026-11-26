@@ -7,7 +7,7 @@ Changelog for the HA History Explorer Card.
 ## [v1.2.92] - 2026-11-24
 
 ### Changed
-- The cache no longer kept by day: by source (the history, each period of statistics) and series, its values in time order — a value's time its only place — and the time asked; every time UTC, the local time only for the display; read with a binary search, whatever the window's length (before, a pass over every day shown). Purged the farthest from the window first, value by value (before, by whole days)
+- The cache no longer kept by day: by source (the history, each period of statistics) and series, its values in time order — a value's time its only place — and the time asked; every time UTC, the local time only for the display; read with a binary search, whatever the window's length (before, a pass over every day shown). Purged the farthest from the window first, value by value (before, by whole days). What the window reads asked, and read alike for every series: a curve's whole groups at the window's edges (its columns of pixels, aggregation groups, bar intervals, arrow zones); an entity an option reads (a color, a fill, an arrow's length) over the time of the curves it's for, an arrow length's scale over the time around the window too, as an automatic Y axis (before, the days the window touched)
 
 ### Fixed
 - A page left open past midnight: the states Home Assistant pushed after it put in the cache's previous day, past its end — a window across midnight drew them out of time order, a line going back and forth across the graph (issue #323)
@@ -16,6 +16,7 @@ Changelog for the HA History Explorer Card.
 - A value recorded exactly at a request's start (midnight, for a day's) taken for the state Home Assistant repeats there: no value of the sensor — a silence drawn in smart mode. Where all the time before it is known, the state given at a request's start is the same as the row before it (nothing) or a change at that very time (a value recorded)
 - The device's clock not set as Home Assistant's, ahead of it: the values of the last minutes could be missed until the page was loaded again — the time a request covers now counted by Home Assistant's clock, told by the times it gives
 - The device's clock behind Home Assistant's: its newest values after the end of the window in real time, shown only once the device's time reached them — now the later of both clocks
+- The device's clock set while the page is open (back an hour): the loading around the window in the background put off as long — every duration now on a clock that's never set
 - Answers coming out of order (Home Assistant answering several requests at once): an older one could replace newer values until the next refresh — the newest kept at each time
 - 5-minute statistics asked again from within a period: that period missing until a later refresh — asked by whole periods
 - The daily, weekly and monthly statistics asked on this device's calendar: a period cut in two where its time zone isn't Home Assistant's — asked on Home Assistant's
@@ -25,7 +26,7 @@ Changelog for the HA History Explorer Card.
 - A locked Y axis panned: a label near its edge disappeared, came back as the edge's own label when the edge reached its value, then disappeared again — two rules near an edge, a graduation left out within a step of it (a quarter of one off the grid, 1.2.91), the edge labelled only on the step's grid. One rule now: every multiple of the step between the edges, as near them as it may be, each labelled — the edge itself on the grid too, off it none —, a label gone only when its value leaves the axis
 
 ### Internal
-- Tests (`yscale`): a locked axis' edges moved a hundredth at a time — a graduation there exactly while it's within them; (`smart`): a page left open past midnight, states pushed after it — in time order, drawn once; the changes of daylight saving time (Paris, March and October) — a value every 10 minutes through the night, the graduations and the tooltip's times; (`features`): a statistics hour that won't come asked again once at most; every test: the cache's rules checked after each change (values in time order, within a span, no repeated request start)
+- Tests (`yscale`): a locked axis' edges moved a hundredth at a time — a graduation there exactly while it's within them; (`smart`): a page left open past midnight, states pushed after it — in time order, drawn once; the changes of daylight saving time (Paris, March and October) — a value every 10 minutes through the night, the graduations and the tooltip's times; (`features`): a statistics hour that won't come asked again once at most; (`cache`, new): the cache's logic against the odd cases — answers out of order, a request's start and end, values outside what was asked, states pushed late or twice, the device's clock set otherwise or while the page is open, two cards of a page, Home Assistant in another time zone, statistics by whole periods, a refresh while the same time is asked, the purge at fractions of a ms; every test: the cache's rules checked after each change (values in time order, within a span, no repeated request start)
 
 
 ## [v1.2.91] - 2026-11-23

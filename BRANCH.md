@@ -53,7 +53,11 @@ any other. The rules, checked after each change while the tests run (`_checkCach
   this device's — every time it dates (a state's last update, a value it recorded, the end of a
   period it compiled) its clock there at least, the most it told kept on this device's steady
   clock (never set): never told earlier than before; a span known as of that, asked up to the
-  later of the two clocks — now, for the window in real time too; the requests' times
+  later of the two clocks — now, for the window in real time too; what the page knows of Home
+  Assistant (its clock, what it compiled) one for all its cards; every duration this device
+  measures (the background's pace) on its steady clock. Its limit: Home Assistant's own clock
+  set back (its host's) — told later than it is until it's caught up again, the states pushed
+  covering the curves shown meanwhile; the requests' times
   UTC, whole seconds; statistics asked by whole periods — 5 minutes and hours on UTC's grid,
   days, weeks and months on Home Assistant's calendar (its time zone).
 
