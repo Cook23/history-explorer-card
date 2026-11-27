@@ -453,20 +453,17 @@
     } });
 
   // ---------------------------------------------------------------------------
-  // The dot of the value a hover is on (hover.dotOnHover, see _hecUpdateHoverDot): drawn
-  // over the curves as its point would be if shown — its own style and border — at the size
-  // of a dot shown by default
-  Chart.plugins.register({
-    id: 'hecHoverDot',
-    afterDatasetsDraw: function (chart) {
-      var el = chart._hecHoverDot;
-      if (!el || !el._view) return;
-      var ds = chart.data.datasets[el._datasetIndex] || {};
-      chart.ctx.save();
-      Chart.elements.Point.prototype.draw.call({ _chart: chart, _model: el._model,
-        _view: Chart.helpers.extend({}, el._view, { radius: Chart.hecDotRadius(ds) }) });
-      chart.ctx.restore();
-    } });
+  // The dot of the value a hover is on (hover.dotOnHover, see _hecUpdateHoverDot): drawn on
+  // the chart's overlay (_hecPaintOverlay, with the cursor line) as its point would be if
+  // shown — its own style and border — at the size of a dot shown by default: the chart never
+  // drawn again for it
+  var _hecPaintHoverDot = function (c, ctx) {
+    var el = c._hecHoverDot;
+    if (!el || !el._view) return;
+    var ds = c.data.datasets[el._datasetIndex] || {};
+    Chart.elements.Point.prototype.draw.call({ _chart: { ctx: ctx }, _model: el._model,
+      _view: Chart.helpers.extend({}, el._view, { radius: Chart.hecDotRadius(ds) }) });
+  };
 
   // ---------------------------------------------------------------------------
   // A label in the margin left of the plot, on the line of the time labels (an X axis'
@@ -519,13 +516,78 @@
   // under it — on that chart, or when its shared is true on every chart of its dragScope whose
   // shared is true, at that same time: each at its own time axis' pixel for it, wherever its
   // plot is (charts aligned or not); on those of them whose tooltips is true, the tooltip at
-  // that time too (hecShowTooltipAt), closed when the line goes
+  // that time too (hecShowTooltipAt), closed when the line goes. Never a chart drawn again for
+  // it: the line on a canvas of its own over the chart's (_hecPaintOverlay), the tooltips as
+  // they are (HTML), once a frame at most
   // (a chart's time axis: its horizontal time scale)
   var _hecTimeScale = function (c) {
     for (var _id in c.scales) { var _s = c.scales[_id]; if (_s.isHorizontal() && typeof _s.getPixelForOffset === 'function') return _s; }
     return null;
   };
   var _hecCursorOpts = function (c) { return (c.options.plugins && c.options.plugins.hecCursorLine) || {}; };
+  // (chart c's overlay painted as it is now — what follows the pointer: its cursor line
+  // (c._hecCursorLine), the elements highlighted (c.active, the tooltip's), its hover dot
+  // (c._hecHoverDot, see _hecPaintHoverDot) —: on a transparent canvas laid over its own —
+  // its size and place, never taking the pointer —, wiped and drawn there alone: the chart's
+  // drawing never touched, nor read)
+  var _hecPaintOverlay = function (c) {
+    var _cv = c.canvas;
+    if (!_cv) return;
+    var _l = c._hecCursorLine, _ts = _hecTimeScale(c), _a = c.chartArea;
+    var _x = _l && _l.draw && _l.t !== null && _ts ? _ts.getPixelForOffset(_l.t) : null;
+    var _line = _x !== null && _x >= _a.left && _x <= _a.right, _dot = !!(c._hecHoverDot && c._hecHoverDot._view), o = c._hecOverlay;
+    var _act = (c.active || []).filter(function (el) { return el && el._view && !el._view.skip; });
+    if (!o && !_line && !_dot && !_act.length) return;
+    if (!o) {
+      o = c._hecOverlay = document.createElement('canvas');
+      o.style.cssText = 'position:absolute;pointer-events:none;z-index:0;';
+    }
+    if (!c._hecAttachToCanvasParent(o)) return;
+    // (its place and size the chart's canvas', in its pixels)
+    if (o.width !== _cv.width || o.height !== _cv.height) { o.width = _cv.width; o.height = _cv.height; }
+    var _st = o.style, _w = _cv.clientWidth + 'px', _h = _cv.clientHeight + 'px', _lf = _cv.offsetLeft + 'px', _tp = _cv.offsetTop + 'px';
+    if (_st.width !== _w) _st.width = _w; if (_st.height !== _h) _st.height = _h; if (_st.left !== _lf) _st.left = _lf; if (_st.top !== _tp) _st.top = _tp;
+    var ctx = o.getContext('2d'), _r = _cv.clientWidth ? _cv.width / _cv.clientWidth : 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, o.width, o.height);
+    ctx.setTransform(_r, 0, 0, _r, 0, 0);
+    if (_line) {
+      ctx.save();
+      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = _hecCursorOpts(c).color || 'black';
+      ctx.beginPath();
+      ctx.moveTo(_x, _a.bottom);
+      ctx.lineTo(_x, _a.top);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // (the elements highlighted — the tooltip's —: each drawn as Chart.js draws it hovered, its
+    // controller's hover style on a copy of it, on the overlay)
+    _act.forEach(function (el) {
+      var _meta = c.getDatasetMeta(el._datasetIndex);
+      if (!_meta || !_meta.controller) return;
+      var f = Object.create(el);
+      f._model = helpers.extend({}, el._view);
+      _meta.controller.setHoverStyle(f);
+      f._view = f._model;
+      f._chart = Object.create(c);
+      f._chart.ctx = ctx;
+      ctx.save(); f.draw(_a); ctx.restore();
+    });
+    if (_dot) { ctx.save(); _hecPaintHoverDot(c, ctx); ctx.restore(); }
+  };
+  // (the charts whose line changed, painted at the next frame — the tooltips opened there too)
+  var _hecCursorDirty = [], _hecCursorFrame = 0;
+  var _hecCursorFlush = function () {
+    _hecCursorFrame = 0;
+    var _l = _hecCursorDirty; _hecCursorDirty = [];
+    _l.forEach(function (d) {
+      var c = d.chart;
+      if (!c.canvas || !c.ctx) return;
+      _hecPaintOverlay(c);
+      if (d.tooltip) { var _w = c._hecCursorLine; if (_w.draw) c.hecShowTooltipAt(_w.t); else if (c._hecTooltipAt) c.hecEndTooltip(); }
+    });
+  };
   Chart.plugins.register({
     id: 'hecCursorLine',
     afterInit: function (chart) {
@@ -547,26 +609,23 @@
         var _was = c._hecCursorLine;
         if (_was && _was.draw === _line.draw && _was.t === _line.t) return;
         c._hecCursorLine = _line;
+        var _d = null;
+        for (var i = 0; i < _hecCursorDirty.length; i++) if (_hecCursorDirty[i].chart === c) _d = _hecCursorDirty[i];
         // (another chart's tooltip at that time — its own, the pointer over it, left alone)
-        if (c !== chart && _hecCursorOpts(c).tooltips) {
-          if (_line.draw) c.hecShowTooltipAt(_line.t); else if (c._hecTooltipAt) c.hecEndTooltip();
-        }
-        c.draw();
+        if (!_d) _hecCursorDirty.push({ chart: c, tooltip: c !== chart && !!_hecCursorOpts(c).tooltips });
       });
+      if (_hecCursorDirty.length && !_hecCursorFrame) _hecCursorFrame = (window.requestAnimationFrame || setTimeout)(_hecCursorFlush);
     },
-    afterDatasetsDraw: function (chart, easing, opts) {
-      var _l = chart._hecCursorLine, _ts = _hecTimeScale(chart);
-      if (!_l || !_l.draw || _l.t === null || !_ts) return;
-      var ctx = chart.ctx, _a = chart.chartArea, _x = _ts.getPixelForOffset(_l.t);
-      if (!( _x >= _a.left && _x <= _a.right )) return;
-      ctx.save();
-      ctx.lineWidth = 1.0;
-      ctx.strokeStyle = (opts && opts.color) || 'black';
-      ctx.beginPath();
-      ctx.moveTo(_x, _a.bottom);
-      ctx.lineTo(_x, _a.top);
-      ctx.stroke();
-      ctx.restore();
+    // (the chart drawn again — its size, its plot area, its time axis, its points may have
+    // changed: its overlay painted again as it is now)
+    afterDraw: function (chart) {
+      if (chart._hecOverlay) _hecPaintOverlay(chart);
+    },
+    // (the chart gone: its overlay with it)
+    destroy: function (chart) {
+      var o = chart._hecOverlay;
+      if (o && o.parentNode) o.parentNode.removeChild(o);
+      chart._hecOverlay = null;
     } });
 
   // ---------------------------------------------------------------------------
@@ -3614,6 +3673,13 @@
       return A ? { left: A.left, top: A.top, right: A.right, bottom: A.bottom } : { left: 0, top: 0, right: this.width || 0, bottom: this.height || 0 };
     },
 
+    // Public (Chart Custom.js.md §1): the points of dataset i drawn, in the canvas' pixels —
+    // [{ x, y }], those skipped left out
+    hecPointsOf: function (i) {
+      var meta = this.getDatasetMeta(i);
+      return (meta && meta.data || []).filter(function (p) { return p && p._view && !p._view.skip; }).map(function (p) { return { x: p._view.x, y: p._view.y }; });
+    },
+
     // ── The values over the graph (hecSetValues) ──
 
     // Public (Chart Custom.js.md §1): the values shown over the chart, given by its owner —
@@ -3825,7 +3891,8 @@
       }
       if (el === (me._hecHoverDot || null)) return;
       me._hecHoverDot = el;
-      me.render({ duration: 0, lazy: true });
+      // (on the chart's overlay: the chart itself never drawn again for it)
+      _hecPaintOverlay(me);
       // (the values over the graph: the hovered one's in its curve's place — _hecShowHoveredValue)
       me._hecShowHoveredValue(el);
     },
@@ -3877,24 +3944,40 @@
         if (el) _els.push(el);
       });
       if (me.options.tooltips && me.options.tooltips.hecFirstOnly) _els = _els.slice(0, 1);
-      if (me.lastActive && me.lastActive.length) me.updateHoverStyle(me.lastActive, me.options.hover.mode, false);
-      if (_els.length) me.updateHoverStyle(_els, me.options.hover.mode, true);
-      me.active = _els;
-      me.lastActive = _els;
+      // (the same elements as shown: nothing to do — else the tooltip alone, the chart not
+      // drawn again: its floating element as Tooltip.draw puts it)
+      var _was = me.tooltip._active || [];
+      if (_was.length === _els.length && _was.every(function (e, i) { return e === _els[i]; })) return;
       me._hecTooltipAt = _els.length > 0;
       me.tooltip._active = _els;
       me.tooltip.update(true, true);
       me.tooltip.pivot();
+      me._hecHoverChanged();
     },
+
+    // What follows the pointer shown as it is now — the elements hovered changed: the elements
+    // highlighted (me.active) on the chart's overlay, the tooltip in its floating element —, the
+    // chart itself never drawn again for it (its points never restyled: see updateHoverStyle)
+    _hecHoverChanged: function () {
+      var me = this;
+      _hecPaintOverlay(me);
+      if (me.tooltip) { me.tooltip.transition(1); me.tooltip.draw(); }
+    },
+
+    // (the elements hovered never restyled: their hover look drawn on the chart's overlay —
+    // _hecPaintOverlay —, the chart never drawn again for a hover)
+    updateHoverStyle: function () {},
 
     // The tooltip closed at once and its mode ended, the point it showed back to its normal
     // look, no hover dot — a menu opens over the card: nothing of the tooltip stays over it
     hecEndTooltip: function () {
       var me = this;
+      // (the overlay painted again only when a point was shown highlighted — a tooltip or a
+      // hover over it: nothing shown, nothing painted — the hover dot by _hecUpdateHoverDot itself)
+      var _shown = !!(me.active && me.active.length);
       me._hecTooltipAt = false;
       me._hecEndTooltipMode();
       me._hecUpdateHoverDot(null);
-      if (me.active && me.active.length) me.updateHoverStyle(me.active, me.options.hover.mode, false);
       me.active = [];
       me.lastActive = [];
       me._hecLastHitXY = undefined;
@@ -3904,23 +3987,22 @@
         // (removed at once, not faded out: nothing of it over the menu)
         if (me.tooltip._hecHoverTooltipEl) Chart.hecUi.closeFloating(me.tooltip._hecHoverTooltipEl);
       }
-      me.render({ duration: 0, lazy: true });
+      if (_shown) _hecPaintOverlay(me);
     },
 
-    // Ends the hover: the highlighted points go back to their normal look, fading as the
-    // tooltip does (Chart.hecUi.FADE), and the tooltip closes — when the tooltip fades out
-    // by itself. A move or a contact on a point opens them again, as before.
+    // Ends the hover: the highlighted points gone from the overlay, and the tooltip closes —
+    // when the tooltip fades out by itself. A move or a contact on a point opens them again,
+    // as before.
     _hecEndHover: function () {
       var me = this;
       if (!me.active || !me.active.length) return;
-      me.updateHoverStyle(me.active, me.options.hover.mode, false);
       me.active = [];
       me.lastActive = [];
       if (me.tooltip) {
         me.tooltip._active = [];
         me.tooltip.update(true);
       }
-      me.render({ duration: Chart.hecUi.FADE, lazy: true });
+      me._hecHoverChanged();
     },
 
     // ── A drag: its target, its feedback (ghost, insertion marker, drop target), the zoom selection ──

@@ -280,14 +280,16 @@ export class CardGraphs
         return _entity;
     }
 
+    // Each graph's move handle shown when the card has several graphs — a graph drawn again
+    // only when it changes for it (a graph added or removed changes it for the others only
+    // between one graph and two)
     _updateMoVisibility()
     {
-        const _single = this.graphs.length <= 1;
+        const _shown = this.graphs.length > 1;
         for( let g of this.graphs ) {
-            if( g.chart ) {
-                g.chart.options.moveHandleVisible = !_single;
-                this.redrawChart(g);
-            }
+            if( !g.chart || g.chart.options.moveHandleVisible === _shown ) continue;
+            g.chart.options.moveHandleVisible = _shown;
+            this.redrawChart(g);
         }
     }
 

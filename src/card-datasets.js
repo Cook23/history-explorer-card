@@ -973,7 +973,10 @@ export class CardDatasets
         const _num = x => { if( x === null || x === undefined || x === '' ) return undefined; const v = Number(this.processRaw(x, process)); return Number.isFinite(v) ? v : undefined; };
         // (each value's parts: its time within the window, cut where its length's series
         // changes, each with its length there)
+        // (a part: one object — in a column, the part itself when it's whole there, else a piece of
+        // it, of: the part — see below)
         const _parts = [], _cuts = len?.times ?? [];
+        const _part = (v, lo, hi, statistics, period, a, b) => _parts.push({ v, lo, hi, statistics, period, a, b, len: len?.at ? len.at(( a + b ) / 2, v) : undefined });
         let c = 0;
         for( let i = 0; i < data.length; i++ ) {
             const v = _num(data[i].state);
@@ -981,13 +984,12 @@ export class CardDatasets
             const a = Math.max(_start, msOf(data[i].last_changed)), b = Math.min(_until, i + 1 < data.length ? msOf(data[i + 1].last_changed) : _until);
             if( b <= a ) continue;
             const st = data[i].statistics;
-            const value = { v, lo: st ? _num(st.min) ?? v : v, hi: st ? _num(st.max) ?? v : v, statistics: !!st, period: st ? st.period ?? msOf(st.end) - msOf(data[i].last_changed) : 0 };
+            const lo = st ? _num(st.min) ?? v : v, hi = st ? _num(st.max) ?? v : v, period = st ? st.period ?? msOf(st.end) - msOf(data[i].last_changed) : 0;
             while( c < _cuts.length && _cuts[c] <= a ) c++;
             let t = a;
-            for( let k = c; k < _cuts.length && _cuts[k] < b; k++ ) { _parts.push({ ...value, a: t, b: _cuts[k] }); t = _cuts[k]; }
-            _parts.push({ ...value, a: t, b });
+            for( let k = c; k < _cuts.length && _cuts[k] < b; k++ ) { _part(v, lo, hi, !!st, period, t, _cuts[k]); t = _cuts[k]; }
+            _part(v, lo, hi, !!st, period, t, b);
         }
-        for( const p of _parts ) p.len = len?.at ? len.at(( p.a + p.b ) / 2, p.v) : undefined;
         // (each column's parts: a part cut where a column ends)
         const out = [];
         let col = [], k0 = null;
@@ -995,7 +997,7 @@ export class CardDatasets
             if( !col.length ) return;
             const _last = out[out.length - 1];
             // (a value alone in its column, after itself alone in the one before: the same row)
-            if( col.length === 1 && _last?.[4].alone === col[0].of && _last[1] === col[0].a ) {
+            if( col.length === 1 && _last?.[4].alone === ( col[0].of ?? col[0] ) && _last[1] === col[0].a ) {
                 const x = col[0], d = x.b - x.a, r = _last[4];
                 _last[1] = x.b; r.span += d;
                 if( x.len !== undefined ) { r.lenSpan += d; r.lenWeight += d * Math.abs(x.len); }
@@ -1007,7 +1009,8 @@ export class CardDatasets
                 if( ( k + 1 ) * cw <= a ) k++;
                 const b = Math.min(p.b, ( k + 1 ) * cw);
                 if( k !== k0 ) { _flush(); col = []; k0 = k; }
-                col.push({ ...p, a, b, of: p });
+                // (the part whole in its column: itself; cut by a column's end, a piece of it)
+                col.push(a === p.a && b === p.b ? p : { v: p.v, lo: p.lo, hi: p.hi, statistics: p.statistics, period: p.period, len: p.len, a, b, of: p });
                 a = b;
             }
         }
@@ -1046,7 +1049,7 @@ export class CardDatasets
                   byLen: byLen === undefined ? undefined : _shown(byLen),
                   statistics, ...( statisticsPeriod ? { statisticsPeriod } : {} ), sides: this.bandWanted(e, statistics, 2), turn,
                   // (a value alone: which one — its row joined to the next column's when it's alone there too)
-                  alone: parts.length === 1 ? parts[0].of : undefined }];
+                  alone: parts.length === 1 ? parts[0].of ?? parts[0] : undefined }];
     }
 
     // --------------------------------------------------------------------------------------

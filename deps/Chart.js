@@ -4639,13 +4639,11 @@
             if (bufferedRequest) {
               // If we have an update that was triggered, we need to do a normal render
               me.render(bufferedRequest);
-            } else if (changed && !me.animating) {
-              // If entering, leaving, or changing elements, animate the change via pivot
-              me.stop();
-
-              // We only need to render at this point. Updating will cause scales to be
-              // recomputed generating flicker & using more memory than necessary.
-              me.render(me._hecHoverEnded ? Chart.hecUi.FADE : me.options.hover.animationDuration, true);
+            } else if (changed) {
+              // (fork) the elements hovered changed: what follows the pointer shown again —
+              // the elements highlighted and the tooltip, on the chart's overlay and in their
+              // floating element —, the chart itself never drawn again for it (_hecHoverChanged)
+              me._hecHoverChanged();
             }
 
             me._bufferedRender = false;
@@ -4829,15 +4827,13 @@
               me.updateHoverStyle(me.lastActive, hoverOptions.mode, false);
             }
 
-            // Built in hover styling
+            // Built in hover styling — (fork) a no-op: the hover look drawn on the chart's overlay
+            // (deps/chart-hec.js updateHoverStyle, _hecPaintOverlay)
             if (me.active.length && hoverOptions.mode) {
               me.updateHoverStyle(me.active, hoverOptions.mode, true);
             }
 
             changed = !helpers.arrayEquals(me.active, me.lastActive);
-            // (fork) nothing left active: the points fade back to their normal look as
-            // the tooltip fades out (see eventHandler)
-            me._hecHoverEnded = changed && !me.active.length;
 
             // Remember Last Actives
             me.lastActive = me.active;

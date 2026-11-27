@@ -968,11 +968,11 @@ export class CardCharts
     }
 
     // Graph g's top control (Chart.js hecTopControl): its bar interval selector, placed by
-    // its chart in its top row, between the handle and the close button — none: null
+    // its chart in its top row, between the handle and the close button — none: null. Set as
+    // the graph is built: placed as it's drawn with its data, never drawn again for it
     setTopControl(g, el)
     {
         g.chart.options.hecTopControl = el ?? null;
-        this.redrawChart(g);
     }
 
     // How many points graph g draws, all its datasets together (the performance test)
@@ -1122,6 +1122,9 @@ export class CardCharts
         // (a graph added from the card: its close button, Chart.js' floating icon — a click on
         // it removes the graph, _onGraphClick)
         chart.options.closeButtonVisible = !isStatic;
+        // (its move handle shown when the card has other graphs — set here, not drawn again for
+        // it: see _updateMoVisibility)
+        chart.options.moveHandleVisible = this.graphs.length > 0;
         chart.options.closeButtonTitle = i18n('ui.menu.graph_delete');
 
         const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);

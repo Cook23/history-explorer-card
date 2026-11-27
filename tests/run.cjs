@@ -1,6 +1,6 @@
 // Runs every interaction test suite against the built history-explorer-card.js (run
-// `yarn build` first). usage: yarn test [lint|architecture|store|legend|mouse|touch|cards|features|panel|curvemenu|arrowline|scale|options|persistence|devices|documented|pen|colors|yaxes|yscale|graphmenu|attributes|copies|values|smart|minigraph|appearance|menus|indirect|cache ...]
-const SUITES = ['lint', 'architecture', 'store', 'legend', 'mouse', 'touch', 'cards', 'features', 'panel', 'curvemenu', 'arrowline', 'scale', 'options', 'persistence', 'devices', 'documented', 'pen', 'colors', 'yaxes', 'yscale', 'graphmenu', 'attributes', 'copies', 'values', 'realtime', 'points', 'smart', 'settings', 'modes', 'minigraph', 'appearance', 'menus', 'indirect', 'cache'];
+// `yarn build` first). usage: yarn test [lint|architecture|store|legend|mouse|touch|cards|features|panel|curvemenu|arrowline|scale|options|persistence|devices|documented|pen|colors|yaxes|yscale|graphmenu|attributes|copies|values|smart|minigraph|appearance|menus|indirect|cache|speed ...]
+const SUITES = ['lint', 'architecture', 'store', 'legend', 'mouse', 'touch', 'cards', 'features', 'panel', 'curvemenu', 'arrowline', 'scale', 'options', 'persistence', 'devices', 'documented', 'pen', 'colors', 'yaxes', 'yscale', 'graphmenu', 'attributes', 'copies', 'values', 'realtime', 'points', 'smart', 'settings', 'modes', 'minigraph', 'appearance', 'menus', 'indirect', 'cache', 'speed'];
 
 (async () => {
     const only = process.argv.slice(2);

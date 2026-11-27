@@ -208,9 +208,12 @@ module.exports = async function()
         await t.page.mouse.move(5, 5); await t.wait(300);
         const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
             const v=c.getDatasetMeta(0).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40&&v.y>A.top+30&&v.y<A.bottom-30)[4]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
-        // (the pixels drawn — not the background — within 8 px of the value, on the canvas)
+        // (the pixels drawn — not the background — within 8 px of the value, as seen: the canvas
+        // and its overlay over it, the hover dot's)
         const inked = () => t.E(`(()=>{ const c=graphAt(0).chart, r=c.canvas.getBoundingClientRect(), k=c.canvas.width/r.width;
-            const d=c.ctx.getImageData(Math.round((${p.x}-r.left)*k)-8, Math.round((${p.y}-r.top)*k)-8, 17, 17).data;
+            const m=document.createElement('canvas'); m.width=c.canvas.width; m.height=c.canvas.height; const x=m.getContext('2d');
+            x.drawImage(c.canvas, 0, 0); if( c._hecOverlay ) x.drawImage(c._hecOverlay, 0, 0);
+            const d=x.getImageData(Math.round((${p.x}-r.left)*k)-8, Math.round((${p.y}-r.top)*k)-8, 17, 17).data;
             let n=0; for(let i=0;i<d.length;i+=4) if(d[i+3]>40 && d[i]+d[i+1]+d[i+2]<600) n++; return n; })()`);
         await t.page.mouse.move(p.x - 30, p.y, { steps: 3 }); await t.page.mouse.move(p.x + 1, p.y + 1, { steps: 5 }); await t.wait(300);
         const dot = await hoverDot(0), hovered = await inked();
@@ -240,8 +243,12 @@ module.exports = async function()
     const valuePt = (gi, k) => t.E(`(()=>{ const c=graphAt(${gi}).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
         const ps=c.getDatasetMeta(0).data.filter(p=>!p._view.skip&&p._view.x>A.left+40&&p._view.y>A.top+30&&p._view.y<A.bottom-30); const p=ps[${k}];
         return {x:r.left+p._view.x, y:r.top+p._view.y, i:p._index}; })()`);
-    // The radius of value i of curve 0 of graph gi, and the radius of the points shown
-    const radius = (gi, i) => t.E(`(()=>{ const c=graphAt(${gi}).chart, d=c.data.datasets[0]; return { r: c.getDatasetMeta(0).data[${i}]._model.radius, R: (d.borderWidth+2)/2 }; })()`);
+    // The radius value i of curve 0 of graph gi is drawn at — highlighted (the tooltip's), as the
+    // chart's overlay draws it: its controller's hover style —, and the radius of the points shown
+    const radius = (gi, i) => t.E(`(()=>{ const c=graphAt(${gi}).chart, d=c.data.datasets[0], m=c.getDatasetMeta(0), el=m.data[${i}];
+        let r = el._model.radius;
+        if( ( c.active || [] ).includes(el) ) { const f = Object.create(el); f._model = { ...el._view }; m.controller.setHoverStyle(f); r = f._model.radius; }
+        return { r, R: (d.borderWidth+2)/2 }; })()`);
     // Clicked, then left still until the tooltip's reading time is over: the point clicked
     const afterReading = async (gi, k) => {
         const p = await valuePt(gi, k); await t.page.mouse.click(p.x, p.y); await t.wait(300);
@@ -348,7 +355,7 @@ module.exports = async function()
         return menu.same && menu.r === 0 && press.same && press.r > 0 ? true : JSON.stringify({ menu, press });
     });
     await t.step('the long-press: None → All; All → Hovered (never None)', async () => {
-        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesLook(g, [g.entities[0]], 'showPoints', false); })()`); await t.wait(400);
+        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesLook([{ g: g, curves: [g.entities[0]] }], 'showPoints', false); })()`); await t.wait(400);
         const none = await look(0);
         const p = await valuePt(0, 3); await t.longPress(p); const all = await look(0);
         await t.longPress(await valuePt(0, 3)); const hover = await look(0);

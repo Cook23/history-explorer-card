@@ -236,5 +236,53 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── Every choice of the card's options menu over many graphs, at once: what they show worked
+    // out whole once at most, saved once at most, each graph built again once at most ──
+    const _many = ['sensor.power', 'sensor.power2', 'sensor.tank', 'sensor.rain', 'sensor.gas', 'sensor.power_kw', 'sensor.energy', 'sensor.net_energy'];
+    const t2 = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
+        graphs: [..._many.map(entity => ({ type: 'line', entities: [{ entity }] })), { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }, { height: 2000, mock: { series: true } });
+    await t2.wait(1500);
+    // (in the page: the counts, the visible lines of a box — its own, not a box under it —, a line clicked)
+    await t2.E(`(()=>{ const I = el.instance, wrap = (name, key) => { const o = I[name]; I[name] = function() { window.__n[key]++; return o.apply(this, arguments); }; };
+        window.__n = { redraws: 0, writes: 0, rebuilds: 0 };
+        // (what they show worked out whole: not the graphs off the screen drawn after those on it — only)
+        const _g = I.generateGraphDataFromCache; I.generateGraphDataFromCache = function(cause, only) { if( !only ) window.__n.redraws++; return _g.apply(this, arguments); }; wrap('writeLocalState', 'writes'); wrap('rebuildGraph', 'rebuilds');
+        window.__lines = id => { const b = el.querySelector('#' + id); return b ? [...b.querySelectorAll('a')].filter(a => a.offsetParent && a.closest('[id$="_sub"], #eo_0') === b) : []; };
+        // (a submenu's line: clicked unless its box is open already — a menu reopened soon opens the submenu it had open)
+        window.__click = (id, k, final) => { const l = window.__lines(id), a = typeof k === 'string' ? l.find(x => x.id === k) : l[k]; if( final || !a.id || !el.querySelector('#' + a.id + '_sub')?.offsetParent ) a.click(); }; })()`);
+    const _close = async () => { for( let k = 0; k < 4; k++ ) await t2.page.keyboard.press('Escape'); await t2.page.mouse.click(5, 1990); await t2.wait(250); };
+    // (a path: the boxes and lines from the menu, [box id, line index]…)
+    const _open = async path => { await _close(); await t2.E(`el.querySelector('#bo_0').click()`); await t2.wait(350);
+        for( const [b, k] of path ) { await t2.E(`window.__click('${b}', ${JSON.stringify(k)}, false)`); await t2.wait(250); } };
+    const _labels = id => t2.E(`window.__lines('${id}').map(a => [a.textContent, a.id || ''])`);
+    // (every final choice of the sections: their lines, and the lines of their submenus — not an
+    // entity searched, a color picked, a threshold added: a value typed, not chosen)
+    const _choices = [];
+    for( const sec of ['rep', 'appearance', 'interp', 'behavior'] ) {
+        await _close(); await t2.E(`el.querySelector('#bo_0').click()`); await t2.wait(350);
+        if( !await t2.E(`window.__lines('eo_0').some(a => a.id === 'eo_0_${sec}')`) ) continue;
+        await _open([['eo_0', `eo_0_${sec}`]]);
+        const top = await _labels(`eo_0_${sec}_sub`);
+        for( const [k, [label, id]] of top.entries() ) {
+            if( !label.endsWith('▸') ) { _choices.push({ name: sec + ' › ' + label, path: [['eo_0', `eo_0_${sec}`], [`eo_0_${sec}_sub`, k]] }); continue; }
+            await _open([['eo_0', `eo_0_${sec}`], [`eo_0_${sec}_sub`, k]]);
+            for( const [j, [l2]] of ( await _labels(id + '_sub') ).entries() )
+                if( !l2.endsWith('▸') && !/Pick|Entity|Add/.test(l2) ) _choices.push({ name: sec + ' › ' + label + ' › ' + l2, path: [['eo_0', `eo_0_${sec}`], [`eo_0_${sec}_sub`, k], [id + '_sub', j]] });
+        }
+    }
+    await t2.step(`every choice of the card's options menu (${_choices.length}) over 9 graphs: what they show worked out once at most, saved once at most, each graph built again once at most`, async () => {
+        const bad = [];
+        for( const c of _choices ) {
+            const path = c.path;
+            await _open(path.slice(0, -1));
+            await t2.E(`window.__n = { redraws: 0, writes: 0, rebuilds: 0 }`);
+            const [b, k] = path.at(-1); await t2.E(`window.__click('${b}', ${JSON.stringify(k)}, true)`); await t2.wait(900);
+            const n = await t2.E('window.__n');
+            if( n.redraws > 1 || n.writes > 1 || n.rebuilds > 9 ) bad.push(c.name + ' ' + JSON.stringify(n));
+        }
+        return _choices.length > 20 && !bad.length ? true : JSON.stringify({ n: _choices.length, bad });
+    });
+    done(await t2.close());
+
     return { passed, failed };
 };

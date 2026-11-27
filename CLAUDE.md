@@ -63,7 +63,7 @@ Two kinds of values, by what they mean to the user:
   moment, it hides what is behind it — not a configuration to sync: nobody adds a curve to
   hide it. The statistics export's period serves once, for the export done right away; shown
   in bold next time it reminds which one was just made — no use on another device. Same for
-  the points shown, the tooltip modes, the Y axes' padlock. Losing them on this device
+  the points shown, the tooltip behaviors, the Y axes' padlock. Losing them on this device
   because the page was refreshed (an internet connection problem) is unpleasant: they are
   kept on this device.
 - **The configuration of what's shown** (the graphs, their curves and their organization,

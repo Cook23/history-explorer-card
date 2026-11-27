@@ -122,9 +122,12 @@ retention, the entity created later) — an attribute, told by its entity's hist
 - **The history after the statistics** (what Home Assistant hasn't compiled yet): the entities
   from the same time together, in one request.
 - **Sending:**
-  - one queue: by phase, then phase 2's block, then the graphs' order — phase 2 queued right
-    behind phase 1, without waiting for its answers; phase 1's parts wholly outside the window
-    shown (its sides, the window moved) after phase 2 — phase 3; a request bringing nothing to the window
+  - one queue: the window of the graphs on the screen first (phases 1 and 2), then that of
+    the graphs off the screen, then the sides — each by phase, then phase 2's block, then the
+    graphs' order —: what's shown complete as soon as it can be, Home Assistant's time the
+    same in all; phase 2 queued right behind phase 1, without waiting for its answers; phase
+    1's parts wholly outside the window shown (its sides, the window moved) — phase 3 —
+    last; a request bringing nothing to the window
     shown now after — one asked for a window before, bringing some of this one, keeps its
     place (the window moved: arrows, a drag, a zoom);
   - the window shown loading as long as a request bringing some of it is under way;

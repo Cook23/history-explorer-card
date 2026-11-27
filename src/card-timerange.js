@@ -452,16 +452,17 @@ export class CardTimeRange
             const t1 = moment(t_center).add(_length * (1.0 - t_position), _unit);
             this._setWindow(moment(t1).subtract(_length, _unit), t1);
 
-            this.applyTimeAxes();
-
+            // (each graph's time axis set as it's drawn with its data — applyTimeAxis, from
+            // buildChartData —: drawn once, never first with the data it had)
             this.updateHistory();
 
         }
     }
 
-    // Applies the current time window and tick step to graph g's time axis, and redraws it —
-    // the only place a graph's time axis is set (a time range set applies it: setStepSize)
-    applyTimeAxis(g)
+    // Applies the current time window and tick step to graph g's time axis, and redraws it
+    // (draw false: set only, for a drawing about to come — the graph resized) — the only place
+    // a graph's time axis is set (a time range set applies it: setStepSize)
+    applyTimeAxis(g, draw = true)
     {
         // (the room of a right Y axis kept on its right — Chart.js hecRightAxisRoom, px —, when it
         // has none: as wide as theirs, when one of its linked graphs has one — their time
@@ -475,6 +476,7 @@ export class CardTimeRange
         _time.stepSize = this.activeRange.tickStepSize;
         _time.min = this.startTime;
         _time.max = this.endTime;
+        if( !draw ) return;
         const _t = performance.now();
         this.redrawChart(g);
         perf.add('chart', performance.now() - _t, { graph: this.graphs.indexOf(g) });

@@ -199,7 +199,7 @@ filterEntities: 'sensor.*energy*'   # or a list; excludeFilterEntities removes m
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png" alt="A click on a curve: the tooltip, at the value pointed at" width="912">
 
-- **Mode** — `selected`: the curves clicked; `nearest`: the value pointed at; `mixed`: both; `all`: every curve's value at that time.
+- **Behavior** — `selected`: the curves clicked; `nearest`: the value pointed at; `mixed`: both; `all`: every curve's value at that time.
 - **Set by** — the screen's width (`tooltip.largeScreen`, `tooltip.smallScreen`), the card's (`tooltip.largeChart`, `tooltip.smallChart`), or *Behavior ▸ Tooltip ▸*.
 - **Size** — `tooltip.size`: `full`, `compact`, `slim` or `auto`.
 

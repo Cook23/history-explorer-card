@@ -398,7 +398,9 @@ function buildPenEventsTest(body)
 //    took —, until the window is whole;
 // 4. the window moved — '<' 3 times, '>' 3 times, dragged back —: each until whole, the
 //    requests sent meanwhile, whether each brought some of the window shown;
-// 5. the real time;
+// 5. choices and gestures — a curve's look, every curve's, the cursor line and the tooltips on
+//    every graph, the pointer along a curve, a zoom —: each timed, the graphs' draws counted;
+// 6. the real time;
 // and, on its own button, back on the page: the user leaves the app and comes back — Home
 // Assistant's connection, the card taken off the page and made again or not, each of its
 // steps until drawn, the freezes
@@ -411,6 +413,7 @@ const PERF_REALTIME_S = 30;        // the real time watched that long
 const PERF_BACK_WATCH_S = 15;      // back on the page: watched that long
 const PERF_TICK_MS = 50;           // the page's pulse: a pulse late by more than
 const PERF_FREEZE_MS = 250;        // this is a freeze
+const PERF_SETTLE_MS = 500;        // a choice or a gesture over once no frame was late for that long
 
 // The browser of a user agent: the Home Assistant app (its version, the web view it runs in),
 // Firefox, Edge, Opera, Samsung Internet, Chrome, Safari — its name and version
@@ -431,7 +434,7 @@ export function browserOf(ua)
 function buildPerformanceTest(body, card)
 {
     body.insertAdjacentHTML('beforeend', `
-        <p class="lead">Measures what this card costs on this device, with its entities, its time window and this Home Assistant: the graphs drawn again, the window loaded again from nothing (each request to Home Assistant), the window moved ('&lt;' and '&gt;' 3 times each, a drag), ${PERF_REALTIME_S} s of real time. A freeze is a moment the page couldn't answer. Set the time window you want to measure first; the test takes a few minutes — the page may freeze while it runs.</p>
+        <p class="lead">Measures what this card costs on this device, with its entities, its time window and this Home Assistant: the graphs drawn again, the window loaded again from nothing (each request to Home Assistant), the window moved ('&lt;' and '&gt;' 3 times each, a drag), choices and gestures (a curve's look, every curve's, the cursor line on every graph, the pointer along a curve, a zoom — nothing saved, the curves set back as they were), ${PERF_REALTIME_S} s of real time. A freeze is a moment the page couldn't answer. Set the time window you want to measure first; the test takes a few minutes — the page may freeze while it runs.</p>
         <section class="box"><div class="row"><button id="start" type="button">Start</button><span class="hint" id="step"></span></div></section>
         <section class="box"><h2>Back on the page</h2><p class="lead">Press the button, switch to another app for a while (a few minutes: long enough for the page to go blank when you come back), then come back here: what happens then is measured for ${PERF_BACK_WATCH_S} s.</p>
             <div class="row"><button id="back" type="button">Measure a return</button><span class="hint" id="backStep"></span></div></section>
@@ -644,6 +647,91 @@ function buildPerformanceTest(body, card)
         });
     };
 
+    // Choices and gestures, each timed — until no frame is late for PERF_SETTLE_MS: its longest
+    // frame, its frames late (over PERF_TICK_MS) —, the graphs' draws counted (every chart's): a menu's choice (the same operations as the menus: one curve's look, every
+    // curve's, the cursor line on every graph — nothing saved, the curves set back as they
+    // were after each one), the pointer moved along a curve (its tooltip following it; then the
+    // cursor line and the tooltips on every graph), a zoom (the window halved, then back)
+    const actions = async () => {
+        out('\n== Choices and gestures');
+        const _Chart = Chart;
+        if( !card.graphs.length ) return;
+        const timed = async (label, how) => {
+            if( stopped ) return;
+            step(`${label}…`);
+            await wait(400);
+            // (every chart's draws counted — a graph built again draws with a chart of its own —,
+            // each frame's length: from one frame to the next)
+            let draws = 0, _frames = [], _on = true;
+            const _draw = _Chart.prototype.draw;
+            _Chart.prototype.draw = function() { draws++; return _draw.apply(this, arguments); };
+            let _f = performance.now();
+            const _tick = () => { if( !_on ) return; const n = performance.now(); _frames.push(n - _f); _f = n; requestAnimationFrame(_tick); };
+            requestAnimationFrame(_tick);
+            record();
+            const _t = performance.now();
+            await how();
+            // (over: no frame late for PERF_SETTLE_MS)
+            let _end = performance.now();
+            for( let n = _frames.length; performance.now() - _end < PERF_SETTLE_MS && !stopped; ) {
+                await new Promise(f => requestAnimationFrame(f));
+                if( _frames.slice(n).some(d => d > PERF_TICK_MS) ) _end = performance.now();
+                n = _frames.length;
+            }
+            _on = false;
+            _Chart.prototype.draw = _draw;
+            const r = stop();
+            if( !r ) return;
+            const _late = _frames.filter(d => d > PERF_TICK_MS);
+            out(`  ${label}: over after ${ms(_end - _t)}, the longest frame ${ms(max(_frames))}, ${_late.length} frames over ${PERF_TICK_MS} ms — ${draws} graphs drawn; ${freezes(r)}`);
+        };
+        // (nothing saved meanwhile; every curve's options as they were, then — by its series and
+        // its graph: a graph built again holds entities of its own —, the graphs built again)
+        const _save = card.writeLocalState;
+        card.writeLocalState = () => {};
+        const _key = e => e.entity + '\u0001' + e.groupId;
+        const _kept = new Map(card.graphs.flatMap(g => g.entities.map(e => [_key(e), { ...e }])));
+        const _back = () => {
+            for( const g of card.graphs ) for( const e of g.entities ) {
+                const v = _kept.get(_key(e));
+                if( !v ) continue;
+                for( const k of Object.keys(e) ) if( !( k in v ) ) delete e[k];
+                Object.assign(e, v);
+            }
+            card.rebuildGraphs([...card.graphs]);
+        };
+        try {
+            const _curves = g => g.entities.filter((e, i) => card.isCurve(g, i));
+            const g0 = () => card.graphsInDisplayOrder().find(g => _curves(g).length);
+            if( g0() ) {
+                const e0 = _curves(g0())[0], w = ( e0.width ?? 2 ) === 3 ? 4 : 3;
+                await timed("a curve's look changed (its width)", () => card.setCurvesLook([{ g: g0(), curves: [e0] }], 'width', w));
+                _back(); await wait(500);
+                await timed("every curve's look changed (their width, the card's menu)", () => card.setCurvesLook(card.graphs.map(g => ({ g, curves: _curves(g) })).filter(p => p.curves.length), 'width', w));
+                _back(); await wait(500);
+            }
+            // (the pointer along graph g's first curve, 30 moves, a frame apart — as a mouse)
+            const _along = async g => {
+                const c = g.chart, A = c.hecPlotRect(), r = c.canvas.getBoundingClientRect();
+                const v = c.hecPointsOf(0).filter(p => p.x > A.left + 20 && p.x < A.right - 20);
+                const _move = (x, y) => c.canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + x, clientY: r.top + y, pointerType: 'mouse', bubbles: true }));
+                for( let k = 0; k < 30 && v.length; k++ ) { const p = v[Math.floor(k * ( v.length - 1 ) / 29)]; _move(p.x, p.y); await new Promise(f => requestAnimationFrame(f)); }
+                c.canvas.dispatchEvent(new PointerEvent('pointerout', { pointerType: 'mouse', bubbles: true }));
+            };
+            if( g0() ) {
+                await timed('the pointer along a curve (30 moves, its tooltip following it)', () => _along(g0()));
+                await timed('the cursor line and the tooltips on every graph (the card\'s menu)', () => card.setGraphsCursor(card.graphs, { cursorMode: 'all', cursorTypes: ['all'], tooltipMode: 'all' }));
+                await timed('the pointer along a curve, the cursor line and the tooltips on every graph', () => _along(g0()));
+                _back(); await wait(500);
+            }
+            const _range = [card.activeRange.timeRangeHours, card.activeRange.timeRangeMinutes];
+            await timed('a zoom (the window halved)', () => _range[0] > 1 ? card.applyTimeRange(Math.max(1, Math.round(_range[0] / 2)), true) : card.applyTimeRangeMinutes(Math.max(1, Math.round(( _range[1] || 60 ) / 2)), true));
+            await timed('the window back to its length', () => _range[0] ? card.applyTimeRange(_range[0], true) : card.applyTimeRangeMinutes(_range[1], true));
+        } finally {
+            card.writeLocalState = _save;
+        }
+    };
+
     const realtime = async () => {
         out(`\n== ${PERF_REALTIME_S} s of real time`);
         step(`Watching the real time (${PERF_REALTIME_S} s)…`);
@@ -712,6 +800,7 @@ function buildPerformanceTest(body, card)
         await redraws();
         if( !stopped ) await load();
         if( !stopped ) await moves();
+        if( !stopped ) await actions();
         if( !stopped ) await realtime();
         step(stopped ? 'Stopped.' : 'Done: copy the report below.');
         $('start').disabled = false;

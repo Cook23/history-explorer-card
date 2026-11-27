@@ -378,5 +378,46 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The card's options menu over many graphs: a cursor, an alignment chosen — no graph built
+    // again, nothing worked out again; the pointer moved: no graph drawn again for its line or
+    // the other graphs' tooltips ──
+    const _many = ['sensor.power', 'sensor.power2', 'sensor.tank', 'sensor.rain', 'sensor.gas', 'sensor.power_kw', 'sensor.energy', 'sensor.net_energy'];
+    t = await openCard(card({ graphs: _many.map(entity => ({ type: 'line', entities: [{ entity }] })) }), { height: 1600, mock: { series: true } });
+    await t.wait(1500);
+    // (each graph's chart, its draws and the card's redraws counted from now on)
+    const COUNT = `(()=>{ const I = el.instance; window.__charts = I.graphsInDisplayOrder().map(g => g.chart); window.__draws = window.__charts.map(() => 0);
+        window.__charts.forEach((c, k) => { const d = c.draw; c.draw = function() { window.__draws[k]++; return d.apply(this, arguments); }; });
+        window.__redraws = 0; const o = I.generateGraphDataFromCache; I.generateGraphDataFromCache = function() { window.__redraws++; return o.apply(this, arguments); }; })()`;
+    const SAME = `(()=>{ const I = el.instance; return JSON.stringify({ same: I.graphsInDisplayOrder().every((g, k) => g.chart === window.__charts[k]), redraws: window.__redraws }); })()`;
+    const chooseCard = async (sub, item) => { await t.E(`el.querySelector('#bo_0').click()`); await t.wait(400); await t.E(`el.querySelector('#eo_0_${sub.split('_')[0]}').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_${sub}').click()`); await t.wait(300);
+        await t.E(`[...el.querySelectorAll('[id^="eo_0_"] a')].find(a => a.textContent === '${item}' && a.offsetParent).click()`); await t.wait(800); };
+    await t.step('the card\'s options menu, Behavior ▸ Cursor ▸ All graphs, with tooltips: every graph given it — none built again, nothing worked out again', async () => {
+        await t.E(COUNT);
+        await chooseCard('behavior_cursor', 'All graphs, with tooltips');
+        const r = JSON.parse(await t.E(SAME));
+        r.set = await t.E(`el.instance.graphsInDisplayOrder().every(g => { const o = g.chart.options.plugins.hecCursorLine; return o.show && o.shared && o.tooltips; })`);
+        return r.same && r.redraws === 0 && r.set ? true : JSON.stringify(r);
+    });
+    await t.step('the pointer moved over a graph (20 moves): the line on every graph, the other graphs\' tooltips open — not one graph drawn again for them', async () => {
+        await t.E(COUNT);
+        const p = await t.E(`graphPtAt(0, 0.3)`);
+        for( let k = 0; k < 20; k++ ) { await t.page.mouse.move(p.x + k * 6, p.y); await t.wait(40); }
+        await t.wait(300);
+        const r = await t.E(`(()=>{ const I = el.instance, gs = I.graphsInDisplayOrder();
+            return { draws: window.__draws.slice(1), line: gs.map(g => g.chart._hecCursorLine?.draw && !!g.chart._hecOverlay ? 1 : 0).join(''),
+                     tips: gs.slice(1).map(g => ( g.chart.tooltip?._active?.length ?? 0 ) > 0 ? 1 : 0).join('') }; })()`);
+        return r.draws.every(n => n === 0) && /^1+$/.test(r.line) && /^1+$/.test(r.tips) ? true : JSON.stringify(r);
+    });
+    await t.step('the card\'s options menu, Appearance ▸ Alignment ▸ Justified: every graph aligned — none built again, nothing worked out again', async () => {
+        await t.page.mouse.move(2, 2); await t.wait(300);
+        await t.E(COUNT);
+        await chooseCard('appearance_alignment', 'Justified');
+        const r = JSON.parse(await t.E(SAME));
+        r.aligned = await t.E(`el.instance.graphsInDisplayOrder().every(g => g.entities.every(e => e.alignment === 'justified'))`);
+        return r.same && r.redraws === 0 && r.aligned ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

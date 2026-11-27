@@ -34,7 +34,7 @@ const COMMON = [
     ['a curve dropped onto a graph of another type', null, drop('sensor.power_kw', 'binary_sensor.a')],
     ['a timeline row moved before another', null, drop('binary_sensor.b', 'binary_sensor.a', 0)],
     ['a curve moved before another', null, drop('sensor.power_kw', 'sensor.power', 0)],
-    ['an interpolation', null, `I.setInterpolation(G('sensor.power'), [G('sensor.power').entities[0]], 'makima')`],
+    ['an interpolation', null, `I.setInterpolation([{ g: G('sensor.power'), entities: [G('sensor.power').entities[0]] }], 'makima')`],
     ['a curve added', null, `I.addCurves(['sensor.rain'], 'default')`],
     ['the time range', null, `I.applyTimeRange(48, true); I.writeLocalState()`],
 ];

@@ -167,7 +167,7 @@ module.exports = async function()
     });
     await t.step('a Tooltip choice is kept after a reload', async () => {
         const modes = `JSON.stringify(el.instance.graphs.flatMap(g=>g.entities.map(e=>[e.largeChartTooltip ?? null, e.largeScreenTooltip, el.instance.tooltipBehaviorOf(e)])))`;
-        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'nearest'); })()`); await t.wait(800);
+        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip([{ g: g, curves: g.entities }], 'nearest'); })()`); await t.wait(800);
         const before = await t.E(modes);
         await t.page.reload(); await t.wait(3500);
         const after = await t.E(modes);
@@ -361,7 +361,7 @@ module.exports = async function()
             r.chartWins === 'nearest | nearest' && r.graphChart === 'selected | all' && r.spellings === 'nearest | all'
             && r.smallCardScreen === 'all | all' && r.smallCardChart === 'nearest | nearest' ? true : JSON.stringify(r));
         await t.step('the menu sets the option giving the mode where the card is: no largeChartTooltip set, largeScreenTooltip alone', async () => {
-            const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'all');
+            const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip([{ g: g, curves: g.entities }], 'all');
                 const e=g.entities[0]; return [e.largeChartTooltip, e.largeScreenTooltip, e.smallChartTooltip, e.smallScreenTooltip, g.chart.data.datasets[0].hecTooltip].join(); })()`);
             // (each curve's options copied on it when it's added: its smallScreenTooltip the default, selected)
             return v === ',all,,selected,all' ? true : v;
@@ -369,7 +369,7 @@ module.exports = async function()
         done(await t.close());
         t = await openCard(card({ ...two, graphs: [{ ...two.graphs[0], options: { largeChartTooltip: 'selected' } }, two.graphs[1]] }), { mock: { series: true } });
         await t.step('largeChartTooltip set (on its graph): the menu sets the curve\'s own largeChartTooltip, its largeScreenTooltip untouched', async () => {
-            const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'nearest');
+            const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip([{ g: g, curves: g.entities }], 'nearest');
                 const e=g.entities[0]; return [e.largeChartTooltip, e.largeScreenTooltip, g.chart.data.datasets[0].hecTooltip].join(); })()`);
             // (its largeScreenTooltip copied when it's added: the default, mixed — untouched)
             return v === 'nearest,mixed,nearest' ? true : v;

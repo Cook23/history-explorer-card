@@ -48,10 +48,10 @@ module.exports = async function()
         const dragged = { tip: await tip(), mode: await mode() };
         return pressed.tip === null && !pressed.mode && dragged.tip === null && !dragged.mode ? true : JSON.stringify({ pressed, dragged });
     });
-    await t.step('left still, the tooltip stays its reading time (0.5 s, plus 400 ms a word by default), then fades out with the highlighted point', async () => {
+    await t.step('left still, the tooltip stays its reading time (0.5 s, plus 400 ms a word by default), then fades out, the highlighted point gone with it — the graph not drawn again for it (the point on its overlay)', async () => {
         const p1 = await E('pointPt(0,0.4)');
         await t.page.mouse.click(p1.x, p1.y); await t.wait(300);
-        // (the graph redrawn once the tooltip goes: without it, the point stays on screen)
+        // (the graph's draws counted: none for the hover — the point highlighted on its overlay)
         const r0 = await E(`(()=>{ const c=graphAt(0).chart; window.__draws=0; const d=c.draw; c.draw=function(){ window.__draws++; return d.apply(c, arguments); };
             return { text: c.tooltip._hecHoverTooltipEl.textContent }; })()`);
         const ms = await E(`graphAt(0).chart.constructor.hecUi.readingTime(${JSON.stringify(r0.text)})`);
@@ -59,9 +59,11 @@ module.exports = async function()
         await t.wait(ms - 800);
         const shown = await tip();
         await t.wait(800 + 1000 + 500);
-        const r1 = await E(`(()=>{ const c=graphAt(0).chart; return { active: c.active.length, draws: __draws }; })()`);
+        const r1 = await E(`(()=>{ const c=graphAt(0).chart, o=c._hecOverlay, d=o ? o.getContext('2d').getImageData(0, 0, o.width, o.height).data : [];
+            let inked = 0; for( let i = 3; i < d.length; i += 4 ) if( d[i] > 0 ) inked++;
+            return { active: c.active.length, draws: __draws, overlay: !!o, inked }; })()`);
         const gone = await tip();
-        return ms === 500 + 400 * words && words > 0 && shown && gone === null && r1.active === 0 && r1.draws > 0 ? true : JSON.stringify({ ms, shown, gone, r0, r1 });
+        return ms === 500 + 400 * words && words > 0 && shown && gone === null && r1.active === 0 && r1.draws === 0 && r1.overlay && r1.inked === 0 ? true : JSON.stringify({ ms, shown, gone, r0, r1 });
     });
     await t.step('picking a label: on it, just beside it; none clearly beside, halfway between two, or on the curves', async () => {
         const r = await E(`(()=>{ const c=graphAt(0).chart; const b=c.legend.legendHitBoxes; const at=(x,y)=>c._hecLegendIndexAt(x,y);

@@ -662,6 +662,16 @@ export class CardHistory
         this.generateGraphDataFromCache(moved ? REDRAW_CAUSES.moved : REDRAW_CAUSES.window);
     }
 
+    // As updateHistory, for graphs gs only (built again: the others as they are): what the
+    // window lacks asked, what gs show — every graph showing one of their series — worked out
+    // and drawn again
+    updateHistoryOf(gs)
+    {
+        this.showDate();
+        this._askMissing();
+        this.generateGraphDataFromCache(REDRAW_CAUSES.window, new Set(gs.flatMap(g => g.entities.map(e => e.entity))));
+    }
+
     // The graphs resized: their curves worked out again when the plot's width changed by
     // PX_HYSTERESIS or more since they were drawn whole — a point a column of pixels (see
     // card-datasets.js _lineSamples): narrower, more values in a column; wider, fewer
@@ -1554,7 +1564,8 @@ export class CardHistory
     // under way until it's answered, or fails (even before it's sent); o: { phase (0 to 2:
     // see _askMissing; none: an export's), rank (phase 2's block, from the right), background,
     // raw (the promise gives { error, result }: the answer itself — the probe's) }.
-    // Sent by phase, then by rank, then those of the graphs on the screen first, in the graphs' order — a window no longer shown's
+    // Sent the window of the graphs on the screen first, then that of the others, then the sides
+    // — each by phase, then by rank, then in the graphs' order —, a window no longer shown's
     // after (see ha-requests.js). The answer put in the
     // cache, what's still lacking asked, the graphs drawn again → a promise of its error,
     // null for none (an export waits for it). Its time whole seconds — as Home Assistant is
@@ -1573,11 +1584,13 @@ export class CardHistory
         for( const id of ids ) { const k = LAYER[kind] + ' ' + id; if( !this._flying.has(k) ) this._flying.set(k, []); this._flying.get(k).push([a, b]); }
         let _p;
         try {
-            // (within a phase and a block: those of the graphs on the screen first —
-            // see shownSeries —, then in the graphs' order)
+            // (the window of the graphs on the screen first — see shownSeries —, then that of the
+            // others, then the sides (PHASE_SIDES); each by phase, then block, then on the screen
+            // first, then in the graphs' order)
             const _at = minOf(ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 499 : Math.min(k, 499); }));
             const _s = this.shownSeries(), _off = ids.some(id => _s.has(id)) ? 0 : 500;
-            const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _off + _at, stale: () => !this._serves(q),
+            const _tier = o.phase === PHASE_SIDES ? 2 : _off ? 1 : 0;
+            const _o = { order: q.background ? Infinity : _tier * 1e9 + ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _off + _at, stale: () => !this._serves(q),
                          info: { phase: o.phase ?? null, background: q.background },
                          // (sent: what it's known as of, and what was seen compiled, then)
                          sent: () => { q.at = this._haNow(); q.sent = steadyNow(); q.compiled = _compiledNow(); } };

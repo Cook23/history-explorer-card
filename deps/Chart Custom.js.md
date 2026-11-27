@@ -24,7 +24,7 @@ only:
 | Direction | Channel | What goes through it |
 |---|---|---|
 | Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration — its parameters: a Y axis' values (`ticks.dataMin` / `dataMax`), bounds, smallest range, margins, step, width; a time axis' unit and step; the magnifier's mode (`zoomSelectMode`, `zoomBoxAxes`) —, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `handleButtons`) |
-| Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()`, `hecPlotRect()`, `hecArmClose()`, `hecCloseArmed()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width and box; the close button armed — nothing else |
+| Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()`, `hecPlotRect()`, `hecPointsOf()`, `hecArmClose()`, `hecCloseArmed()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width and box; the points a dataset drew; the close button armed — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
@@ -136,7 +136,7 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 
 | Option | Type | Default | Effect |
 |---|---|---|---|
-| `hecCursorLine` | `{ show, shared, tooltips, color }` | none | A vertical line at the time under the pointer while it's over the plot area (plugin `hecCursorLine`): drawn when `show`; with `shared`, on every chart of the same `dragScope` whose `shared` is true too, at that same time — each at its own time axis' pixel for it, wherever its plot area is (charts aligned or not); on those of them whose `tooltips` is true, their tooltip opened at that time (`hecShowTooltipAt()`), closed when the line goes; `color` its stroke. |
+| `hecCursorLine` | `{ show, shared, tooltips, color }` | none | A vertical line at the time under the pointer while it's over the plot area (plugin `hecCursorLine`): drawn when `show`; with `shared`, on every chart of the same `dragScope` whose `shared` is true too, at that same time — each at its own time axis' pixel for it, wherever its plot area is (charts aligned or not); on those of them whose `tooltips` is true, their tooltip opened at that time (`hecShowTooltipAt()`), closed when the line goes; `color` its stroke. Never a chart drawn again for it: the line painted over what's drawn (the strip of pixels under it kept, put back when it moves; painted again after a chart's own drawing), the tooltips only, once a frame at most. |
 
 ### Dataset options
 
@@ -207,7 +207,8 @@ it on every chart when one of its menus opens, so nothing of a tooltip stays ove
 
 `chart.hecShowTooltipAt(t)` opens the chart's tooltip at time `t` (ms): on each dataset shown,
 its element at that time, within the picking margin along the time axis (the first one alone
-with `tooltips.hecFirstOnly`); none there, it closes — another chart's cursor line, shared
+with `tooltips.hecFirstOnly`) — the tooltip alone, the chart not drawn again, and nothing done
+while those elements stay the same; none there, it closes — another chart's cursor line, shared
 (`hecCursorLine`), opens it so (the plugin calls it, not the card).
 
 `chart.hecPlotWidth()` — the width of the chart's plot area in pixels (its whole width
@@ -224,6 +225,10 @@ otherwise too easily).
 right, bottom }`; the whole canvas before its first layout): where the curves are drawn — for
 whether they're on the screen (the card: a graph on the screen is one whose plot area is, at
 least in part).
+
+`chart.hecPointsOf(i)` — the points dataset `i` drew, in the chart's canvas, in CSS pixels
+(`[{ x, y }]`, those skipped left out): where its values are — for the card's performance test,
+the pointer moved along a curve.
 
 `chart.hecSetValues(values)` — the values shown over the chart, given by the card (`null`:
 none), drawn by Chart.js in an element of its own right above the chart's box (its canvas'
