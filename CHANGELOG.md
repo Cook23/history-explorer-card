@@ -8,6 +8,7 @@ Changelog for the HA History Explorer Card.
 
 ### Changed
 - A tooltip shown only while the point it shows is on the screen: hidden as soon as its point leaves it, shown again once its point is 10 px inside it (no flicker at the edge) — as it opens, and as the page scrolls; its place and its fade-out the same (`Chart.hecUi.showIfPointShown`, `POINT_IN_PX`)
+- The magnifiers' symbols (↔ ↕ ⤢ − +) smaller, within the glass, clear of its ring, and thinner: a stroke of about a pixel, as the toolbar's '<' and '>'
 
 ### Fixed
 - With *All graphs, with tooltips*, the tooltips of the graphs off the screen shown, piled up at the top or the bottom of the screen
