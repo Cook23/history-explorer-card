@@ -362,7 +362,7 @@ module.exports = async function()
         { type: 'line', entities: [{ entity: 'sensor.tank' }] },
         { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] } ] }), { height: 1200, mock: { series: true } });
     await t.wait(1500);
-    await t.step('Behavior ▸ Cursor ▸ in a line graph\'s menu, after Tooltip: its choices only (none, the graph pointed at, every graph, every graph with tooltips), None in bold (cursor.types: timeline); All graphs, with tooltips chosen — saved on its entities, drawn so, exported as cursor and tooltip', async () => {
+    await t.step('Behavior ▸ Cursor ▸ in a line graph\'s menu, after Tooltip: its choices only (none, the graph pointed at, every graph, every graph with tooltips), None in bold (cursor.types: timeline); All with tooltips chosen — saved on its entities, drawn so, exported as cursor and tooltip', async () => {
         const sub = () => t.E(`(()=>{ const s=[...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(x=>x.style.display!=='none').pop(); return s?[...s.querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '):''; })()`);
         await t.longPress(await t.E(`moPt(0)`)); await t.wait(500);
         await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(400);
@@ -373,7 +373,7 @@ module.exports = async function()
         r.saved = await t.E(`el.instance.graphsInDisplayOrder()[0].entities.map(e=>[e.cursorMode,e.cursorTypes.join('+'),e.tooltipMode].join('/')).join()`);
         r.line = await t.E(`JSON.stringify(el.instance.graphsInDisplayOrder().map(g=>g.chart.options.plugins.hecCursorLine).map(o=>[o.show,o.shared,o.tooltips]))`);
         r.yaml = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0], o=el.instance.yamlObject({ kind: 'graph', g }, false); return JSON.stringify([o.cursor, o.tooltip, 'cursorMode' in o]); })()`);
-        return /^Tooltip ▸ \| Cursor ▸ \| Y axis/.test(r.lines) && r.list === 'None* | Graph pointed at | All graphs | All graphs, with tooltips' && r.saved === 'all/all/all'
+        return /^Tooltip ▸ \| Cursor ▸ \| Y axis/.test(r.lines) && r.list === 'None* | Graph pointed at | All graphs | All with tooltips' && r.saved === 'all/all/all'
             && r.line === '[[true,true,true],[false,false,false],[true,false,false]]' && r.yaml === '[{"mode":"all","types":["all"]},{"mode":"all"},false]' ? true : JSON.stringify(r);
     });
     done(await t.close());
@@ -392,9 +392,9 @@ module.exports = async function()
     const chooseCard = async (sub, item) => { await t.E(`el.querySelector('#bo_0').click()`); await t.wait(400); await t.E(`el.querySelector('#eo_0_${sub.split('_')[0]}').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_${sub}').click()`); await t.wait(300);
         await t.E(`[...el.querySelectorAll('[id^="eo_0_"] a')].find(a => a.textContent === '${item}' && a.offsetParent).click()`); await t.wait(800); };
-    await t.step('the card\'s options menu, Behavior ▸ Cursor ▸ All graphs, with tooltips: every graph given it — none built again, nothing worked out again', async () => {
+    await t.step('the card\'s options menu, Behavior ▸ Cursor ▸ All with tooltips: every graph given it — none built again, nothing worked out again', async () => {
         await t.E(COUNT);
-        await chooseCard('behavior_cursor', 'All graphs, with tooltips');
+        await chooseCard('behavior_cursor', 'All with tooltips');
         const r = JSON.parse(await t.E(SAME));
         r.set = await t.E(`el.instance.graphsInDisplayOrder().every(g => { const o = g.chart.options.plugins.hecCursorLine; return o.show && o.shared && o.tooltips; })`);
         return r.same && r.redraws === 0 && r.set ? true : JSON.stringify(r);

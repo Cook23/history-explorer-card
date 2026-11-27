@@ -1967,7 +1967,7 @@ They are options of the graph, as its alignment: set on the card for every graph
 - `cursor.mode: hide` — no line on it;
 - `tooltip.mode: all`, with `cursor.mode: all` — its tooltip opened at the line's time while the pointer is over another graph: each of its series' value at that time (as the tooltip's `all` behavior shows them), closed when the line goes.
 
-*Behavior ▸ Cursor ▸* of a graph's menu (or of the card's options menu, for every graph) sets them, for the graph whatever its type: None; Graph pointed at; All graphs; All graphs, with tooltips.
+*Behavior ▸ Cursor ▸* of a graph's menu (or of the card's options menu, for every graph) sets them, for the graph whatever its type: None; Graph pointed at; All graphs; All with tooltips.
 
 For example, to line up a heating timeline with the temperature curves, their tooltips read at once:
 

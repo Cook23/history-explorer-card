@@ -532,6 +532,11 @@ are in `tests/points.cjs`:
 
 ## Menus: a cascade, always visible — set by the user, not negotiable
 
+- **A menu line's text as short as its neighbours'** (set by the user): never much longer than
+  the others of its menu — the shortest words that say it, in every language (*All with
+  tooltips*, *Tous avec infobulle*, not *All graphs, with tooltips*). A new line or a translation:
+  compared with its menu's lines first.
+
 How every menu is designed (the curve menu, a graph's, the info panel's, the options menu,
 and any one to come):
 - A menu has sections (*Display*, *Appearance*…), each line ▸ opening its submenu, and a

@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.95] - 2026-11-27
+
+### Changed
+- *Behavior ▸ Cursor ▸ All graphs, with tooltips* shortened to *All with tooltips* (*Tous avec infobulle*…, in every language): as short as the menu's other lines
+
+
 ## [v1.2.94] - 2026-11-27
 
 ### Changed
