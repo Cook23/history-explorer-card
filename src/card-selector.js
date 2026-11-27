@@ -116,13 +116,13 @@ export class CardSelector
             let topPos;
             if( input_idx !== 1 ) {
                 // Top selector: show below
-                const maxH = Math.min(window.innerHeight * 0.5, window.innerHeight - inputRect.bottom);
+                const maxH = Math.min(window.innerHeight * 0.5, Chart.hecUi.shownRect().bottom - inputRect.bottom);
                 topPos = (inputRect.bottom - parentRect.top) + 'px';
                 dropdown.style.bottom = '';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             } else {
                 // Bottom selector: show above
-                const maxH = Math.min(window.innerHeight * 0.5, inputRect.top);
+                const maxH = Math.min(window.innerHeight * 0.5, inputRect.top - Chart.hecUi.shownRect().top);
                 dropdown.style.top = '';
                 dropdown.style.bottom = (parentRect.bottom - inputRect.top) + 'px';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
@@ -135,7 +135,7 @@ export class CardSelector
                 dropdown.style.boxSizing = 'border-box';
                 dropdown.style.width = _w + 'px';
                 if( dropdown._fitted !== _w ) { dropdown._fitted = _w; this.fitEntityLines(input_idx, _w); }
-                dropdown.style.maxHeight = Math.max(0, Math.min(window.innerHeight * 0.5, window.innerHeight - _box.bottom)) + 'px';
+                dropdown.style.maxHeight = Math.max(0, Math.min(window.innerHeight * 0.5, Chart.hecUi.shownRect().bottom - _box.bottom)) + 'px';
                 this.openMenu(dropdown, ( _box.bottom - parentRect.top ) + 'px', ( _box.right - parentRect.left ) + 'px', 'right');
             } else this.openMenu(dropdown, topPos, leftPos);
             this.alignFieldText(input_idx);

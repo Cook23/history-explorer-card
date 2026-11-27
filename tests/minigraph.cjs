@@ -139,6 +139,8 @@ module.exports = async function()
                 const c=new C(cv.getContext('2d'), { type: 'line', data: { labels: ['a','b','c','d'], datasets: [{ data: [0,100,0,0], borderColor: '#f00', borderWidth: 2,
                     fill: 'origin', backgroundColor: 'rgba(0,0,255,0.3)', pointRadius: 0, cubicInterpolationMode: 'monotone', hecInterpolation: algo, lineTension: 0.4 }] },
                     options: { responsive: false, animation: false, legend: { display: false }, scales: { yAxes: [{ ticks: { min: 0, max: 100 } }] } } });
+                // (drawn now: a chart's first drawing waits for the next frame — read at once here)
+                c.draw();
                 const m=c.getDatasetMeta(0).data[1]._view, d=cv.getContext('2d').getImageData(Math.round(m.x), 0, 1, 200).data;
                 let top=-1; for( let y=0; y<200; y++ ) if( d[y*4] > 200 && d[y*4+1] < 80 && d[y*4+3] > 200 ) { top=y; break; }
                 out[algo]={ peak: m.y, top, bottom: c.chartArea.bottom, onArc: c._hecCurveAt(m.x, top), onValue: c._hecCurveAt(m.x, m.y) };

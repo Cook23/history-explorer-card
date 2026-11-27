@@ -109,7 +109,7 @@ module.exports = async function()
         const menuOpen = await t.E('menuOpen()');
         await t.page.keyboard.press('Escape'); await t.wait(200);
         const gone = await t.E(`!${dlg}`);
-        return entries === 'Pen events,Performance' && title === 'Pen events' && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && /pointerup .* d=0px max=0px \d+ms/.test(log) && !menuOpen && gone
+        return entries === 'Pen events,Performance' && /^Pen events — history-explorer-card \d+\.\d+\.\d+(b\d+)?$/.test(title) && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && /pointerup .* d=0px max=0px \d+ms/.test(log) && !menuOpen && gone
             ? true : JSON.stringify({ entries, title, check, log, menuOpen, gone });
     });
     await t.step('Tests ▸ Pen events: the time between two hover moves, each kind of event apart (pointermove, pointerrawupdate, mousemove)', async () => {
@@ -176,7 +176,7 @@ module.exports = async function()
         const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
         await t.page.keyboard.press('Escape'); await t.wait(200);
         // (each graph told on the screen or not; each request, how many of its entities are)
-        const ok = title === 'Performance' && /Graphs: \d+, entities: \d+ \(\d+ with statistics\), points drawn: \d+/.test(out)
+        const ok = /^Performance — history-explorer-card \d+\.\d+\.\d+(b\d+)?$/.test(title) && /Graphs: \d+, entities: \d+ \(\d+ with statistics\), points drawn: \d+/.test(out)
             && /\n  line — \d+ entities, \d+ points, on the screen\n/.test(out)
             // (first, what Home Assistant runs on and this device: see mock-ha.js system)
             && /^Home Assistant [\d.]+: Home Assistant OS on Home Assistant OS 16\.3, aarch64, Raspberry Pi 5, 8\.0 GB memory \(40 % used\), disk 21\.0 GB \/ 228\.5 GB, database MariaDB 11\.4\.5 \(3412\.50 MiB\)\nThis device: .*\d+ cores.*screen \d+×\d+ px, window \d+×\d+ px, pixel ratio [\d.]+\nBrowser: Chrome \d+\n/.test(out)

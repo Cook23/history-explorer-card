@@ -1133,7 +1133,25 @@
     // How long a floating element takes to fade out (its CSS opacity transition)
     FADE: 1000,
 
-    // A tooltip shown only while the point it shows is on the screen (the viewport): hidden
+    // The part of the screen the page is shown on, in client px ({ left, top, right, bottom }):
+    // the viewport less the room the device keeps on its edges — a phone's status bar, its
+    // navigation bar, when the page goes under them (an app showing it edge to edge) —, as the
+    // page tells it (--safe-area-inset-*), else as the browser does (env(safe-area-inset-*)): 0
+    // in a browser's window. Wherever something is placed against the screen's edges
+    shownRect: function () {
+      var p = hecUi._insetProbe;
+      if (!p || !p.isConnected) {
+        p = hecUi._insetProbe = document.createElement('div');
+        p.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:' +
+          ['top', 'right', 'bottom', 'left'].map(function (s) { return 'var(--safe-area-inset-' + s + ', env(safe-area-inset-' + s + ', 0px))'; }).join(' ');
+        document.body.appendChild(p);
+      }
+      var cs = getComputedStyle(p), _px = function (v) { return parseFloat(v) || 0; };
+      return { left: _px(cs.paddingLeft), top: _px(cs.paddingTop), right: window.innerWidth - _px(cs.paddingRight), bottom: window.innerHeight - _px(cs.paddingBottom) };
+    },
+
+    // A tooltip shown only while the point it shows is on the screen (the part shown —
+    // shownRect): hidden
     // as soon as its point leaves it, shown again once its point is POINT_IN_PX inside it (a
     // hysteresis: no flicker at the edge) — as it's placed, and as the page scrolls. Its place
     // the same, its fade-out the same: hidden, never closed. el: a floating element placed for
@@ -1143,9 +1161,9 @@
     showIfPointShown: function (el) {
       var p = el._hecPoint;
       if (!p) return;
-      var r = p.anchor.getBoundingClientRect(), x = r.left + p.dx, y = r.top + p.dy;
+      var r = p.anchor.getBoundingClientRect(), x = r.left + p.dx, y = r.top + p.dy, s = hecUi.shownRect();
       var m = el._hecPointOut ? hecUi.POINT_IN_PX : 0;
-      var _in = x >= m && x <= window.innerWidth - m && y >= m && y <= window.innerHeight - m;
+      var _in = x >= s.left + m && x <= s.right - m && y >= s.top + m && y <= s.bottom - m;
       el._hecPointOut = !_in;
       var _v = _in ? '' : 'hidden';
       if (el.style.visibility !== _v) el.style.visibility = _v;
@@ -1248,11 +1266,13 @@
       var _r = el.getBoundingClientRect();
       // (an element wider than the bounds — a tooltip on a narrow card — kept within the
       // screen only: kept within the bounds, it would be pushed out on their other side)
-      if (_bR && _r.width > Math.min(_bR.right, window.innerWidth) - Math.max(_bR.left, 0)) _bR = null;
+      // (the screen: the part the page is shown on — shownRect)
+      var _s = hecUi.shownRect();
+      if (_bR && _r.width > Math.min(_bR.right, _s.right) - Math.max(_bR.left, _s.left)) _bR = null;
       var _bounds = _bR
-        ? { left: Math.max(_bR.left, 0), right: Math.min(_bR.right, window.innerWidth),
-            top: Math.max(_bR.top, 0), bottom: window.innerHeight }
-        : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+        ? { left: Math.max(_bR.left, _s.left), right: Math.min(_bR.right, _s.right),
+            top: Math.max(_bR.top, _s.top), bottom: _s.bottom }
+        : _s;
       var _dx = 0, _dy = 0;
       if (_r.right > _bounds.right) _dx = _bounds.right - _r.right;
       else if (_r.left < _bounds.left) _dx = _bounds.left - _r.left;
