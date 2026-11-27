@@ -139,7 +139,13 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
     built file and the commit's title (see Versions);
   - **before merging into the line, the build number is removed** (`1.2.94b4` → `1.2.94`) —
     in `package.json`, `src/version.js` and the built file, rebuilt —, committed on the work
-    branch, then merged: never a `bN` in the line.
+    branch, then merged: never a `bN` in the line. The number merged is checked against GitHub
+    first (the last release + 1, past any dead version — see Versions);
+  - **after a merge not released yet**, the work branch goes on with the same version and the
+    next build number, as if nothing had been merged (`1.2.94` merged from `1.2.94b4`, not
+    released: the next build is `1.2.94b5`); a new merge carries `1.2.94` again;
+  - **once the user releases it** (a release on GitHub), the work branch's next build is the next
+    version's first: `1.2.95b1`.
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —
   no code, no test, no commit until the user gives the next instruction.
