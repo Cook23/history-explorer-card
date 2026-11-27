@@ -136,7 +136,10 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
     `v1.1-legacy`) — never a commit or a push to the work branch;
   - its version is Claude's to manage, without asking: the last release + 1 with a build number
     (`1.2.94b1`, `b2`… — one more at each build pushed), in `package.json`, `src/version.js`, the
-    built file and the commit's title (see Versions). Only the merge drops the build number.
+    built file and the commit's title (see Versions);
+  - **before merging into the line, the build number is removed** (`1.2.94b4` → `1.2.94`) —
+    in `package.json`, `src/version.js` and the built file, rebuilt —, committed on the work
+    branch, then merged: never a `bN` in the line.
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —
   no code, no test, no commit until the user gives the next instruction.
