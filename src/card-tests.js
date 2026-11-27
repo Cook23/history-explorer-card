@@ -41,18 +41,22 @@ export const CARD_TESTS = {
 
 // ──────────────────────────────────────────────────────────────────────────────────────
 // The dialog every test opens in: over the whole page, in its own shadow root (the
-// page's styles don't reach it), in the Home Assistant theme's colors
+// page's styles don't reach it), in the Home Assistant theme's colors — its header and its
+// content clear of the room the device keeps on the screen's edges (--safe-area-inset-*: a
+// phone's bars, the page under them — see Chart.hecUi.shownRect)
 // ──────────────────────────────────────────────────────────────────────────────────────
 
 const DIALOG_CSS = `
 .dlg { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; outline: none;
   background: var(--primary-background-color, #f4f6f8); color: var(--primary-text-color, #1b2530);
   font-family: var(--ha-font-family-body, var(--primary-font-family, system-ui, sans-serif)); font-size: 15px; }
-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px;
+  padding: calc(10px + var(--safe-area-inset-top, 0px)) calc(16px + var(--safe-area-inset-right, 0px)) 10px calc(16px + var(--safe-area-inset-left, 0px));
   background: var(--app-header-background-color, var(--primary-color, #03a9f4)); color: var(--app-header-text-color, #fff); }
 h1 { flex: 1; margin: 0; font-size: 1.15rem; font-weight: 600; }
 header button { color: inherit; border-color: currentColor; }
-.body { max-width: 760px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+.body { max-width: 760px; margin: 0 auto; display: grid; gap: 14px;
+  padding: 16px calc(16px + var(--safe-area-inset-right, 0px)) calc(16px + var(--safe-area-inset-bottom, 0px)) calc(16px + var(--safe-area-inset-left, 0px)); }
 .lead { margin: 0; color: var(--secondary-text-color, #5d6b79); line-height: 1.5; }
 .box { background: var(--card-background-color, #fff); border: 1px solid var(--divider-color, #d5dde5); border-radius: 8px;
   padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
@@ -87,9 +91,11 @@ export function openCardTest(key, card)
             </div>
         </div>`;
     const $ = id => root.getElementById(id);
-    $('title').textContent = def.title;
+    // (its title as its report's first line: the test, the card's version — which one ran)
+    const _title = `${def.title} — history-explorer-card ${Version}`;
+    $('title').textContent = _title;
     const test = def.build(root.querySelector('.body'), card);
-    const report = () => `${def.title} — history-explorer-card ${Version}\n${navigator.userAgent}\n\n${test.report()}`;
+    const report = () => `${_title}\n${navigator.userAgent}\n\n${test.report()}`;
 
     $('copy').addEventListener('click', () => copyText(report(), $('reportHint')));
     $('issue').addEventListener('click', () => {

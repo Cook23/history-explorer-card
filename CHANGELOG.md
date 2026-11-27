@@ -7,16 +7,18 @@ Changelog for the HA History Explorer Card.
 ## [v1.2.94] - 2026-11-27
 
 ### Changed
+- The test pages (*Tests ▸ Pen events*, *Performance*) show the card's version in their title, as their report's first line
 - A tooltip shown only while the point it shows is on the screen: hidden as soon as its point leaves it, shown again once its point is 10 px inside it (no flicker at the edge) — as it opens, and as the page scrolls; its place and its fade-out the same (`Chart.hecUi.showIfPointShown`, `POINT_IN_PX`)
 - The magnifiers' symbols (↔ ↕ ⤢ − +) smaller, within the glass, clear of its ring, and thinner: a stroke of about a pixel, as the toolbar's '<' and '>'; the arrows' tips pointed
 
 ### Fixed
-- In the companion app, the sticky toolbar half hidden under Home Assistant's header: the page goes under the phone's status bar and navigation bar, Home Assistant keeps its header and its views clear of them, the card didn't. Now everything the card places against the screen's edges keeps clear of them as Home Assistant does (`--safe-area-inset-*`, 0 in a browser): the top sticky toolbar under the header (`--header-height` + `--safe-area-inset-top`), the bottom one above the navigation bar; the menus, the entity selector's list, the tooltips and messages kept within the part of the screen shown; a drag scrolling the page near its edges; a graph flagged when it's shown (`Chart.hecUi.shownRect`)
+- In the companion app, the sticky toolbar half hidden under Home Assistant's header: the page goes under the phone's status bar and navigation bar, Home Assistant keeps its header and its views clear of them, the card didn't. Now everything the card places against the screen's edges keeps clear of them as Home Assistant does (`--safe-area-inset-*`, 0 in a browser): the top sticky toolbar under the header (`--header-height` + `--safe-area-inset-top`), the bottom one above the navigation bar; the menus, the entity selector's list, the tooltips and messages kept within the part of the screen shown; a drag scrolling the page near its edges; a graph flagged when it's shown (`Chart.hecUi.shownRect`); the test pages (*Tests ▸ Pen events*, *Performance*…): their header below the status bar, their content above the navigation bar
 - With *All graphs, with tooltips*, the tooltips of the graphs off the screen shown, piled up at the top or the bottom of the screen
 - A graph of several curves built once for each of them — built, destroyed and built again with one curve more —, at the card's opening and at every rebuild (a look chosen for every curve: 46 graphs drawn on a card of 17): now each graph built once, at the end of the operation, with all its curves
 - A graph taken off the page or built again kept its chart alive (never destroyed): its events, its observers, the cursor line and the scroll going through it — more of them at each rebuild. Now destroyed, its tooltip closed with it
 - A card's content made again (its YAML changed) started another auto-refresh timer and another resize observer, the former ones never stopped; a card off the page for good kept them running, and its graphs. Now stopped with the content, and a card off the page for good (10 minutes) let go: made again from its YAML should it come back
 - A bar graph's interval, a curve moved, split off, merged, deleted, its type changed, curves added: every graph of the card worked out and drawn again — now only the graphs it changes; a graph removed: the others' time axes only
+- A graph built again with its values in the cache (a look chosen for a curve, or for every curve) drawn twice: first empty, then with its curves, in the same task — the empty one never seen. Now its first drawing waits for the next frame: drawn with its curves before then, only once; its values still to come, drawn empty then, as before
 - The time axes applied again (a day chosen, the alignment, a Y axis' side): every graph drawn again — now only those whose axis changes
 
 ### Internal

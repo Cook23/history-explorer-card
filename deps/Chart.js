@@ -3857,6 +3857,10 @@
             }
 
             me.initialize();
+            // (fork) its first drawing at the next frame (see render): drawn by then with its data
+            // — its owner giving them in the same task, as the card does when they're in its
+            // cache —, that's its only drawing; else drawn then, empty
+            me._hecFirstDraw = true;
             me.update();
           },
 
@@ -4248,6 +4252,15 @@
           render: function (config) {
             var me = this;
 
+            // (fork) the chart's first drawing waits for the next frame: none by then, it's drawn
+            // empty (a drawing before it — draw — makes it needless, see construct)
+            if (me._hecFirstDraw) {
+              me._hecFirstDraw = false;
+              me._hecFirstPending = true;
+              requestAnimationFrame(function () { if (me._hecFirstPending && me.canvas) me.render(); });
+              return me;
+            }
+
             if (!config || typeof config !== 'object') {
               // backwards compatibility
               config = {
@@ -4299,6 +4312,8 @@
 
           draw: function (easingValue) {
             var me = this;
+            // (fork) drawn: its first drawing done (see render)
+            me._hecFirstPending = false;
 
             me.clear();
 
