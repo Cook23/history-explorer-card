@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.93] - 2026-11-26
+## [v1.2.93] - 2026-11-27
 
 ### Added
 - *Tests ▸ Performance*: choices and gestures — a curve's look changed, every curve's (as the card's menu does), the cursor line and the tooltips on every graph, the pointer along a curve with and without them, a zoom —, each until the page is free again, its longest frame, its frames late, the graphs drawn (nothing saved meanwhile, the curves set back as they were)
