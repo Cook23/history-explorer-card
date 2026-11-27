@@ -123,9 +123,20 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
 - **Each real failed test** (a fault of the code, not a test to adapt to a behavior the user
   asked for): search the code for the similar cases — the same mistake elsewhere — and report
   them, before or with the fix.
-- **Never without being asked:** a version bump, a PR, a merge — and a commit or a push anywhere
-  but the work branches. On a work branch (`claude/v1.1-legacy-port`, `claude/v1.2-dev-port`, the
-  working repository), a finished change is committed and pushed without asking (set by the user).
+- **Never without being asked:** a PR, a merge — and a commit or a push anywhere but the work
+  branches.
+- **THE WORK BRANCH IS THE WORKING FOLDER** — set by the user, said again and again, not
+  negotiable. `claude/v1.2-dev-port` (and `claude/v1.1-legacy-port`) is where Claude works, the
+  user's test bench: never a release, nothing there is published. So:
+  - every change compiled is **committed and pushed there at once — before its tests**, without
+    asking, without waiting for anything: compiled → committed → pushed → tested. The user tests
+    from it on their devices;
+  - never ask "shall I commit / push" for it, never hold a build back "until the tests pass";
+  - the tests, the full suite and every check guard **the merge into the line** (`v1.2-dev`,
+    `v1.1-legacy`) — never a commit or a push to the work branch;
+  - its version is Claude's to manage, without asking: the last release + 1 with a build number
+    (`1.2.94b1`, `b2`… — one more at each build pushed), in `package.json`, `src/version.js`, the
+    built file and the commit's title (see Versions). Only the merge drops the build number.
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —
   no code, no test, no commit until the user gives the next instruction.
