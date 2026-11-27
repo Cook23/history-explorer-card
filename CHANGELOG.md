@@ -22,7 +22,7 @@ Changelog for the HA History Explorer Card.
 - The time axes applied again (a day chosen, the alignment, a Y axis' side): every graph drawn again — now only those whose axis changes
 
 ### Internal
-- Tests (`mouse`): a tooltip whose point is off the screen not shown, on the screen shown; the page scrolled: hidden as soon as its point leaves the screen, still hidden 5 px inside, shown 15 px inside; (`features`): a curve's points set on its graph as rebuilt; 10 years: the first point within a column of pixels of the window's start (the columns on a grid of time fixed from 1970 — it failed on some days)
+- Tests (`mouse`): a tooltip whose point is off the screen not shown, on the screen shown; the page scrolled: hidden as soon as its point leaves the screen, still hidden 5 px inside, shown 15 px inside; (`features`): a curve's points set on its graph as rebuilt; 10 years: the first point within a column of pixels of the window's start (the columns on a grid of time fixed from 1970 — it failed on some days); (`features`): the sticky toolbars and the part of the screen shown, with and without a phone's insets; (`cards`): the test pages' title with the version; (`minigraph`): a chart made by the test drawn before its pixels are read
 
 ## [v1.2.93] - 2026-11-27
 
