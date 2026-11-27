@@ -527,5 +527,38 @@ module.exports = async function()
         return down > y0 + 50 && up < down - 50 ? true : JSON.stringify({ y0, down, up });
     });
     const r4 = await t4.close();
-    return { passed: r.passed + r2.passed + r3.passed + r4.passed, failed: r.failed + r2.failed + r3.failed + r4.failed };
+
+    // ── A tooltip shown only while its point is on the screen: hidden as soon as its point leaves it, shown
+    // again once its point is 10 px inside it (Chart.hecUi.showIfPointShown) — as it opens, and as the page scrolls ──
+    const t5 = await openCard({ ...CFG, graphs: [...CFG.graphs, ...CFG.graphs, ...CFG.graphs] }, { height: 700, scrollRoom: 2000, mock: { series: true } });
+    // (graph gi's tooltip: whether it's open and shown, its point's client y)
+    const tipAt = gi => t5.E(`(()=>{ const el=graphAt(${gi}).chart.tooltip._hecHoverTooltipEl; if( !el || !el.isConnected ) return { open: false };
+        const p=el._hecPoint, r=p.anchor.getBoundingClientRect(); return { open: true, shown: getComputedStyle(el).visibility!=='hidden', y: Math.round(r.top+p.dy) }; })()`);
+    const scrollBy = async dy => { await t5.E(`document.scrollingElement.scrollTop += ${dy}`); await t5.wait(150); };
+    await t5.step('a tooltip opened for a point off the screen — the other graphs\' tooltips with the cursor line —: open, not shown; those on the screen shown', async () => {
+        await t5.E(`el.instance.setGraphsCursor(el.instance.graphs, { cursorMode: 'all', cursorTypes: ['all'], tooltipMode: 'all' })`); await t5.wait(300);
+        const p = await t5.E('graphPtAt(0, 0.5)');
+        for( let i = 0; i < 6; i++ ) { await t5.page.mouse.move(p.x - 60 + i * 12, p.y); await t5.wait(40); }
+        await t5.wait(300);
+        const n = await t5.E('el.instance.graphs.length'), tips = [];
+        for( let gi = 1; gi < n; gi++ ) tips.push(await tipAt(gi));
+        const off = tips.filter(x => x.open && x.y > 700), on = tips.filter(x => x.open && x.y >= 0 && x.y <= 700);
+        await t5.page.mouse.move(2, 2); await t5.wait(300);
+        await t5.E(`el.instance.setGraphsCursor(el.instance.graphs, { cursorMode: 'none', cursorTypes: ['all'], tooltipMode: 'auto' })`); await t5.wait(300);
+        return off.length && on.length && off.every(x => !x.shown) && on.every(x => x.shown) ? true : JSON.stringify(tips);
+    });
+    await t5.step('a tooltip open, the page scrolled: hidden as soon as its point leaves the screen; its point back 5 px inside: still hidden; 15 px: shown', async () => {
+        const p = await t5.E('pointPt(0,0.5)');
+        await t5.page.mouse.click(p.x, p.y); await t5.wait(300);
+        const r = { open: await tipAt(0) };
+        if( !r.open.open ) return JSON.stringify(r);
+        await scrollBy(r.open.y + 1); r.out = await tipAt(0);
+        await scrollBy(-6); r.in5 = await tipAt(0);
+        await scrollBy(-10); r.in15 = await tipAt(0);
+        await scrollBy(25); r.outAgain = await tipAt(0);
+        await t5.E('document.scrollingElement.scrollTop = 0'); await t5.wait(150);
+        return r.open.shown && r.out.open && !r.out.shown && r.out.y < 0 && !r.in5.shown && r.in5.y === 5 && r.in15.shown && r.in15.y === 15 && !r.outAgain.shown ? true : JSON.stringify(r);
+    });
+    const r5 = await t5.close();
+    return { passed: r.passed + r2.passed + r3.passed + r4.passed + r5.passed, failed: r.failed + r2.failed + r3.failed + r4.failed + r5.failed };
 };

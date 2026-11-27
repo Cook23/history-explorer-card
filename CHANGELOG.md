@@ -4,6 +4,22 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.94] - 2026-11-27
+
+### Changed
+- A tooltip shown only while the point it shows is on the screen: hidden as soon as its point leaves it, shown again once its point is 10 px inside it (no flicker at the edge) — as it opens, and as the page scrolls; its place and its fade-out the same (`Chart.hecUi.showIfPointShown`, `POINT_IN_PX`)
+
+### Fixed
+- With *All graphs, with tooltips*, the tooltips of the graphs off the screen shown, piled up at the top or the bottom of the screen
+- A graph of several curves built once for each of them — built, destroyed and built again with one curve more —, at the card's opening and at every rebuild (a look chosen for every curve: 46 graphs drawn on a card of 17): now each graph built once, at the end of the operation, with all its curves
+- A graph taken off the page or built again kept its chart alive (never destroyed): its events, its observers, the cursor line and the scroll going through it — more of them at each rebuild. Now destroyed, its tooltip closed with it
+- A card's content made again (its YAML changed) started another auto-refresh timer and another resize observer, the former ones never stopped; a card off the page for good kept them running, and its graphs. Now stopped with the content, and a card off the page for good (10 minutes) let go: made again from its YAML should it come back
+- A bar graph's interval, a curve moved, split off, merged, deleted, its type changed, curves added: every graph of the card worked out and drawn again — now only the graphs it changes; a graph removed: the others' time axes only
+- The time axes applied again (a day chosen, the alignment, a Y axis' side): every graph drawn again — now only those whose axis changes
+
+### Internal
+- Tests (`mouse`): a tooltip whose point is off the screen not shown, on the screen shown; the page scrolled: hidden as soon as its point leaves the screen, still hidden 5 px inside, shown 15 px inside; (`features`): a curve's points set on its graph as rebuilt
+
 ## [v1.2.93] - 2026-11-27
 
 ### Added

@@ -252,9 +252,7 @@ export class CardGraphs
         // `before` (insertBefore semantics) for whatever gets rebuilt in its place.
         this.graphDiv(g).remove();
         this.graphs.splice(this.graphs.indexOf(g), 1);
-        // (no longer watched — see _watchShown)
-        this._shownObserver?.unobserve(g.canvas);
-        this._offscreen?.delete(g); this._staleGraphs?.delete(g);
+        this._releaseGraph(g);
     }
 
     // Removes g.entities[idx] and detaches g. If any entities remain, rebuilds g's
@@ -326,6 +324,7 @@ export class CardGraphs
     // given from the palette's start
     clearGraphs()
     {
+        for( const g of this.graphs ?? [] ) this._releaseGraph(g);
         this.graphs = [];
         this.pconfig.nextDefaultColor = 0;
     }
@@ -383,7 +382,14 @@ export class CardGraphs
         this._updateGroupLinkMarkers();
     }
 
-    addGraph(entity_id, { noAutoGroup = false, color = null, fill = null, before = null, hidden = undefined, isStatic = false, interval = null, groupId = null, entry = null, into = null } = {})
+    addGraph(entity_id, options = {})
+    {
+        // (its chart built at the end of the operation adding it — this one alone, or the one
+        // it's part of: see buildingGraphs)
+        this.buildingGraphs(() => this._addGraph(entity_id, options));
+    }
+
+    _addGraph(entity_id, { noAutoGroup = false, color = null, fill = null, before = null, hidden = undefined, isStatic = false, interval = null, groupId = null, entry = null, into = null } = {})
     {
         // Shows an entity: in a graph of its group it can join (its type, its sub-graph),
         // else — a new entity, without a group — in the last graph if its units are
@@ -459,6 +465,7 @@ export class CardGraphs
             // Delete the old graph, will be regenerated below including the new entity
             _candDiv.remove();
             this.graphs.splice(this.graphs.indexOf(_cand), 1);
+            this._releaseGraph(_cand);
 
         } else {
             _graphIndex = this._newGraphIndex(before);
@@ -507,25 +514,51 @@ export class CardGraphs
         if( type == 'bar' && !this.ui.hideInterval )
             this._this.querySelector(`#bd-${this.g_id}`).addEventListener('change', this.selectBarInterval.bind(this));
 
-        // Create the graph
-        const _dynGid = this.g_id;
-        this.addGraphToCanvas(this.newGraphId(), type, entities, entityOptions, isStatic);
-
-        // Apply interval override if provided
-        const _dynG = this.graphs.find(g => g.id === _dynGid);
-        if( _dynG ) { this.updateGraphHeader(_dynG); this._showPlot(_dynG); this._restoreYAxisLock(_dynG); }
-        if( _dynG && interval !== null && interval !== undefined ) {
-            _dynG.interval = interval;
-            const _bd = this._this.querySelector(`#bd-${_dynGid}`);
+        // The graph, its chart built once the operation knows all its curves (buildingGraphs)
+        const _g = this.addGraphToCanvas(this.newGraphId(), type, entities, entityOptions, isStatic);
+        this.updateGraphHeader(_g); this._showPlot(_g);
+        if( interval !== null && interval !== undefined ) {
+            _g.interval = interval;
+            const _bd = this._this.querySelector(`#bd-${_g.id}`);
             if( _bd ) _bd.value = interval;
         }
+    }
 
-        // (the interval selector placed by the chart, in its top row)
-        if( _dynG ) this.setTopControl(_dynG, this._this.querySelector(`#bd-${_dynGid}`));
+    // fn run as one operation on the graphs: the graphs it adds given all their curves first,
+    // then each one's chart built once, at its end — never a chart built for a graph a curve
+    // joins next (an operation within another: the outer one's end) → what fn returns
+    buildingGraphs(fn)
+    {
+        this._buildingGraphs = ( this._buildingGraphs ?? 0 ) + 1;
+        try { return fn(); }
+        finally { if( --this._buildingGraphs === 0 ) this._buildPendingCharts(); }
+    }
 
-        // Update mo/ca visibility based on graph count
+    // The charts of the graphs added without one yet built (see buildingGraphs): each with its Y
+    // axes' lock, its interval selector in its top row; then the controls their number and
+    // groups give every graph (its move handle, the chain icons)
+    _buildPendingCharts()
+    {
+        const _new = this.graphs.filter(g => !g.chart);
+        for( const g of _new ) {
+            this.buildChart(g);
+            this._restoreYAxisLock(g);
+            this.setTopControl(g, this._this.querySelector(`#bd-${g.id}`));
+        }
+        if( !_new.length ) return;
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
+    }
+
+    // Graph g let go — taken off the page, or made again —: its chart destroyed (Chart.js lets
+    // go of it, of its events and of what it shows over the page), no longer watched (see
+    // _watchShown)
+    _releaseGraph(g)
+    {
+        this._shownObserver?.unobserve(g.canvas);
+        this._offscreen?.delete(g); this._staleGraphs?.delete(g);
+        g.chart?.destroy();
+        g.chart = null;
     }
 
     // Graph g's Y axes locked again as its curves keep them (yAxisLock — see keepYAxisLock),
@@ -829,10 +862,10 @@ export class CardGraphs
     {
         const _saved = this.pconfig.combineSameUnits;
         this.pconfig.combineSameUnits = true;
-        entities.forEach((en, i) => {
+        this.buildingGraphs(() => entities.forEach((en, i) => {
             const _pe = this.store.inGroup(keyOf(en), groupId);
             this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: nextG, groupId, entry: _pe ?? en, ...options });
-        });
+        }));
         this.pconfig.combineSameUnits = _saved;
     }
 
@@ -884,7 +917,7 @@ export class CardGraphs
         // graph are combined again (see addGraph). Statics never persist graphIndex,
         // so for them this is always undefined === undefined — graphKey decides.
         this._rebuildGraphIndex = new Map(this.store.list.map(e => [e, e.graphIndex]));
-        for( let _key of _groupOrder ) {
+        this.buildingGraphs(() => { for( let _key of _groupOrder ) {
             const _group = _groupMap.get(_key);
             const _isStaticGroup = _group.entities.some(e => e.isStatic);
             const _saved = this.pconfig.combineSameUnits;
@@ -900,7 +933,7 @@ export class CardGraphs
                 this.addGraph(_eid, { color: _e.color, fill: _e.fill, hidden: _e.hidden, isStatic: _e.isStatic, interval: _e.interval, groupId: _group.groupId, entry: _e });
             });
             if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
-        }
+        } });
         this._rebuildGraphIndex = null;
         // The rebuild just recomputed graphIndex (and default colors, etc.) fresh
         // from scratch — persist that result now rather than leaving storage stale

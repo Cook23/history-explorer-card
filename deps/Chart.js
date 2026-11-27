@@ -4633,6 +4633,10 @@
 
             var changed = me.handleEvent(e);
 
+            // (fork) the chart destroyed while it handled the event (its owner built it again —
+            // a click on one of its buttons moving a curve): nothing more of it, nothing drawn
+            if (!me.canvas) return me;
+
             plugins.notify(me, 'afterEvent', [e]);
 
             var bufferedRequest = me._bufferedRequest;

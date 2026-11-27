@@ -119,12 +119,14 @@ module.exports = async function()
         await t.wait(4000);
         const r = await t.E(`(()=>{ const I = el.instance, d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null);
             const p = d.find(p => p.statisticsPeriod >= 86400e3);
-            // (the first point in the window: drawn from its start — the points before it, the values around it)
-            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), w = d.filter(p => x(p) >= Date.parse(I.startTime));
-            return { source: I._sourceNeeded(), reaches: I.cache.from <= Date.parse(I.startTime), n: d.length, first: w.length ? Math.round(( x(w[0]) - Date.parse(I.startTime) ) / 86400e3) : null,
+            // (the first point in the window: drawn from its start — the points before it, the values around it —:
+            // within a column of pixels of it, the columns on a grid of time fixed from 1970)
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), s = Date.parse(I.startTime), w = d.filter(p => x(p) >= s);
+            const column = ( Date.parse(I.endTime) - s ) / I.graphs[0].chart.hecPlotWidth();
+            return { source: I._sourceNeeded(), reaches: I.cache.from <= s, n: d.length, first: w.length ? ( x(w[0]) - s ) / column : null,
                      title: p ? I._tooltipTitle(p, '') : null }; })()`);
         r.day = await dayAsked();
-        return r.source === 'day' && r.reaches && r.n > 300 && Math.abs(r.first) <= 2 && r.day && /^Statistics 1 d: /.test(r.title ?? '') ? true : JSON.stringify(r);
+        return r.source === 'day' && r.reaches && r.n > 300 && r.first !== null && r.first <= 1 && r.day && /^Statistics 1 d: /.test(r.title ?? '') ? true : JSON.stringify(r);
     });
     done(await t.close());
     // (the shortest range at least that long: 36 hours, 2 days; 13 hours, a day)
@@ -239,7 +241,8 @@ module.exports = async function()
         await t.E(`(()=>{ window.__copied = []; window.__refuse = false; Object.defineProperty(navigator, 'clipboard', { configurable: true,
             value: { writeText: x => window.__refuse ? Promise.reject(new Error('no')) : ( window.__copied.push(x), Promise.resolve() ) } }); })()`);
         // (the curve's dashes set as its Appearance submenu does)
-        await t.E(`(()=>{ const I = el.instance, g = I.graphs[0]; I.setCurvesLook([{ g: g, curves: [g.entities[0]] }], 'dashMode', 'points'); I.toggleCurvePoints(g, [g.entities[0]]); })()`); await t.wait(800);
+        // (the graph rebuilt by the first: the second on the graph as it now is)
+        await t.E(`(()=>{ const I = el.instance, e = I.graphs[0].entities[0]; I.setCurvesLook([{ g: I.graphs[0], curves: [e] }], 'dashMode', 'points'); I.toggleCurvePoints(I.graphs.find(g => g.entities.includes(e)), [e]); })()`); await t.wait(800);
         const yaml = async (open, prefix, kind) => {
             await t.E('__copied.length = 0'); await open();
             await t.E(`el.querySelector('#${prefix}_export').click()`); await t.wait(300);
