@@ -134,9 +134,10 @@ export function optionsMenuHtml(i)
 // (↕), both (⤢) — and the zoom buttons' beside the range selector: out (−), in (+)
 // (the symbol within the glass's hole, clear of its ring — its stroke and outline included —:
 // the glass grey, the symbol in the text's color)
-const _ZOOM_BOX_SYMBOLS = { x: 'M5.24,9.5H13.76M5.24,9.5L7,7.74M5.24,9.5L7,11.26M13.76,9.5L12,7.74M13.76,9.5L12,11.26',
-                            y: 'M9.5,5.24V13.76M9.5,5.24L7.74,7M9.5,5.24L11.26,7M9.5,13.76L7.74,12M9.5,13.76L11.26,12',
-                            xy: 'M6.24,12.76L12.76,6.24M12.76,6.24H10.51M12.76,6.24V8.49M6.24,12.76H8.49M6.24,12.76V10.51',
+// (each arrowhead one line through its tip: a sharp point there — the stroke's joins, mitred)
+const _ZOOM_BOX_SYMBOLS = { x: 'M5.24,9.5H13.76M7,7.74L5.24,9.5L7,11.26M12,7.74L13.76,9.5L12,11.26',
+                            y: 'M9.5,5.24V13.76M7.74,7L9.5,5.24L11.26,7M7.74,12L9.5,13.76L11.26,12',
+                            xy: 'M6.24,12.76L12.76,6.24M10.51,6.24H12.76V8.49M8.49,12.76H6.24V10.51',
                             out: 'M5.24,9.5H13.76', in: 'M5.24,9.5H13.76M9.5,5.24V13.76' };
 // A magnifier's colors: its glass grey, its symbol in the text's color — or both in color —,
 // outlined in the background's (--hec-mag-bg: the toolbar's, opaque — see _paintMagnifiers)
