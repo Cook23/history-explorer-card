@@ -959,7 +959,8 @@ export class CardGraphs
             Chart.hecUi.outline(_w, false);
             const _clearSoon = () => setTimeout(() => Chart.hecUi.clearOutline(_w), FLAG_SEEN_MS);
             const _r = _w.getBoundingClientRect();
-            if( _r.top >= 0 && _r.bottom <= window.innerHeight ) { _clearSoon(); continue; }
+            const _s = Chart.hecUi.shownRect();
+            if( _r.top >= _s.top && _r.bottom <= _s.bottom ) { _clearSoon(); continue; }
             const _obs = new IntersectionObserver((entries) => {
                 if( !entries[0].isIntersecting ) return;
                 _obs.disconnect();

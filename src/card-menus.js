@@ -117,6 +117,11 @@ function menuBoxesHtml(id, keys, minWidth, z, attrs = '')
     return box(id, minWidth, z, attrs) + keys.map(k => box(`${id}_${k}_sub`, 110, z + 1)).join('');
 }
 
+// Where Home Assistant's header ends, from the top of the page (CSS): its height, and the room
+// above it — the phone's status bar, when the page goes under it (the companion app) — as Home
+// Assistant places its views below it (hui-root.ts: --header-height + --safe-area-inset-top)
+export const HEADER_BOTTOM = 'calc(var(--header-height, 0px) + var(--safe-area-inset-top, 0px))';
+
 // The curve menu et_N and its submenus — the card's (full: marked so, data-card — what only
 // the card's offers: Info, the curves' place) and the info panel's
 export function curveMenuHtml(i, full)
@@ -494,7 +499,7 @@ export class CardMenus
                 const _top = k ? Math.max(_page.top, _open[k - 1].getBoundingClientRect().top) : _page.top;
                 const _cutTop = Math.max(0, _top - _r.top), _cutBottom = Math.max(0, _r.bottom - _page.bottom);
                 _box.style.clipPath = _cutTop || _cutBottom ? `inset(${_cutTop}px 0 ${_cutBottom}px 0)` : '';
-                _box._maskBelow = window.innerHeight - _page.bottom;
+                _box._maskBelow = Chart.hecUi.shownRect().bottom - _page.bottom;
             });
             menuEl._followRaf = requestAnimationFrame(_watch);
         };
@@ -511,7 +516,7 @@ export class CardMenus
 
     // A function giving the page's display zone around anchorEl now (its top and bottom): the
     // screen, within every box scrolling anchorEl (a dialog, a panel, in any shadow tree),
-    // less what covers it — Home Assistant's header (--header-height) and the card's sticky
+    // less what covers it — Home Assistant's header (HEADER_BOTTOM) and the card's sticky
     // toolbars (data-sticky) that don't hold anchorEl
     _zoneOf(anchorEl)
     {
@@ -520,9 +525,14 @@ export class CardMenus
             if( el.nodeType !== 1 ) { el = el.host ?? null; if( !el ) break; }
             if( /(auto|scroll)/.test(getComputedStyle(el).overflowY) ) _clips.push(el);
         }
-        const _header = parseFloat(getComputedStyle(anchorEl).getPropertyValue('--header-height')) || 0;
+        // (the header's bottom as the page has it there, in px: a box that high measured)
+        const _probe = document.createElement('div');
+        _probe.style.cssText = `position:absolute;visibility:hidden;width:0;height:${HEADER_BOTTOM}`;
+        anchorEl.parentNode.appendChild(_probe);
+        const _header = _probe.offsetHeight;
+        _probe.remove();
         return () => {
-            const z = { top: _header, bottom: window.innerHeight };
+            const z = { top: _header, bottom: Chart.hecUi.shownRect().bottom };
             for( const el of _clips ) {
                 const r = el.getBoundingClientRect();
                 z.top = Math.max(z.top, r.top);
@@ -1529,8 +1539,10 @@ export class CardMenus
         const _p = _tb.getBoundingClientRect();
         const _c = Chart.helpers.color(color ?? '#000000');
         this.hideEntityCurveMenu(input_idx);
-        const _left = Math.max(0, ( window.innerWidth - PICKER_SIZE.width ) / 2) - _p.left;
-        const _top = Math.max(0, ( window.innerHeight - PICKER_SIZE.height ) / 2) - _p.top;
+        // (centred in the part of the screen the page is shown on — shownRect)
+        const _s = Chart.hecUi.shownRect();
+        const _left = _s.left + Math.max(0, ( _s.right - _s.left - PICKER_SIZE.width ) / 2) - _p.left;
+        const _top = _s.top + Math.max(0, ( _s.bottom - _s.top - PICKER_SIZE.height ) / 2) - _p.top;
         this.openNativePicker(_tb, 'color', _left, _top, _c.valid ? _c.hexString() : '#000000', apply);
     }
 

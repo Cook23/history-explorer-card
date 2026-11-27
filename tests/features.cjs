@@ -941,6 +941,16 @@ module.exports = async function()
         await t.E('window.scrollTo(0, 0)'); await t.wait(300);
         return r.under && r.hidden ? true : JSON.stringify(r);
     });
+    await t.step('the sticky toolbar scrolled: held under Home Assistant\'s header — its height (--header-height) and, the page under the phone\'s status bar (the companion app), the room above it (--safe-area-inset-top): 0 + 0, 40 + 0, 40 + 24 px', async () => {
+        const r = [];
+        for( const [h, s] of [[0, 0], [40, 0], [40, 24]] ) {
+            await t.E(`(()=>{ const d=document.documentElement.style; d.setProperty('--header-height','${h}px'); d.setProperty('--safe-area-inset-top','${s}px'); window.scrollTo(0, 0); })()`); await t.wait(200);
+            await t.E('window.scrollBy(0, 600)'); await t.wait(300);
+            r.push(await t.E(`Math.round(el.querySelector('div[data-sticky="top"]').getBoundingClientRect().top)`));
+        }
+        await t.E(`(()=>{ const d=document.documentElement.style; d.setProperty('--header-height','0px'); d.removeProperty('--safe-area-inset-top'); window.scrollTo(0, 0); })()`); await t.wait(300);
+        return r.join() === '0,40,64' ? true : r.join();
+    });
     await t.step('a first label too wide beside the handle and the close button: no room kept for them, the icons over the labels in opaque boxes — the label on the first line; wide enough: room kept beside it, half see-through boxes', async () => {
         const at = async w => { await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1200);
             return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend, b=L.legendHitBoxes[0];
@@ -948,6 +958,23 @@ module.exports = async function()
         const narrowish = await at(330), wide = await at(1000);
         return narrowish.line < 14 && narrowish.margins === '4/4' && /rgba\(.*, 0\.8\)$/.test(narrowish.box) && wide.line < 14 && wide.margins === (wide.boxRight + 4) + '/4' && wide.box !== narrowish.box
             ? true : JSON.stringify({ narrowish, wide });
+    });
+    done(await t.close());
+
+    // ── The part of the screen shown (Chart.hecUi.shownRect): the viewport less the room the device
+    // keeps on its edges (--safe-area-inset-*, the page under a phone's bars); the bottom toolbar held above it ──
+    t = await openCard(card({ uiLayout: { toolbar: 'both', selector: 'both', sticky: 'both' }, statistics: { enabled: false }, graphs: [
+            { type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }, { type: 'line', entities: [{ entity: 'sensor.tank' }] }] }),
+        { mock: { series: true }, scrollRoom: 3000, height: 500, init: "document.addEventListener('DOMContentLoaded',()=>document.documentElement.style.setProperty('--header-height','0px'));" });
+    await t.step('the room a phone keeps on the screen\'s edges (--safe-area-inset-*: 24 px top, 30 px bottom): the part of the screen shown without it; the bottom sticky toolbar held above it, the top one below it — none: the whole screen, the toolbars at its edges', async () => {
+        const at = async (top, bottom) => {
+            await t.E(`(()=>{ const d=document.documentElement.style; d.setProperty('--safe-area-inset-top','${top}px'); d.setProperty('--safe-area-inset-bottom','${bottom}px'); window.scrollTo(0, 0); })()`); await t.wait(200);
+            await t.E('window.scrollBy(0, 150)'); await t.wait(300);
+            return t.E(`(()=>{ const s=window.HXLocal_Chart.hecUi.shownRect(), r=k=>el.querySelector('div[data-sticky="'+k+'"]').getBoundingClientRect();
+                return [s.top, innerHeight - s.bottom, Math.round(r('top').top), Math.round(innerHeight - r('bottom').bottom)].join(); })()`);
+        };
+        const r = { with: await at(24, 30), without: await at(0, 0) };
+        return r.with === '24,30,24,30' && r.without === '0,0,0,0' ? true : JSON.stringify(r);
     });
     done(await t.close());
 

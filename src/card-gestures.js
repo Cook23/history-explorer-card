@@ -354,8 +354,9 @@ export class CardGestures
             const _container = this._getScrollContainer();
             if( !_container ) { this._autoScrollRaf = requestAnimationFrame(_scroll); return; }
             const _threshold = 80;
-            const _y = this._autoScrollY;
-            const _viewH = window.innerHeight;
+            // (near the edges of the part of the screen the page is shown on — shownRect)
+            const _s = Chart.hecUi.shownRect(), _y = this._autoScrollY - _s.top;
+            const _viewH = _s.bottom - _s.top;
             let _speed = 0;
             if( _y < _threshold )
                 _speed = -Math.round((_threshold - _y) / 4);

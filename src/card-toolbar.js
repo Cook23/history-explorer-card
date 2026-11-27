@@ -4,7 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { BAR_INTERVALS, TIME_RANGES } from "./history-options.js";
-import { curveMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg, realTimeSvg } from "./card-menus.js";
+import { curveMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg, realTimeSvg, HEADER_BOTTOM } from "./card-menus.js";
 import { perf } from "./card-perf.js";
 import { seriesOfGraphs } from "./history-series.js";
 const moment = window.HXLocal_moment;
@@ -92,7 +92,9 @@ export class CardToolbar
         let html = '';
 
         if( (tools || selector) && (this.ui.stickyTools & (1<<i)) ) {
-            const threshold = i ? 'bottom:0px' : 'top:var(--header-height)';
+            // (the top one under Home Assistant's header: HEADER_BOTTOM; the bottom one above the
+            // room the device keeps at the bottom — a phone's navigation bar, the page under it)
+            const threshold = i ? 'bottom:var(--safe-area-inset-bottom, 0px)' : `top:${HEADER_BOTTOM}`;
             html = `<div data-sticky="${i ? 'bottom' : 'top'}" style="position:sticky;${threshold};padding-top:${this.ui.hideHeader ? 0 : 15}px;padding-bottom:10px;margin-top:-${this.ui.hideHeader ? 0 : 15}px;z-index:1;background-color:var(--card-background-color);line-height:0px;">`;
         } else if( tools || selector ) {
             // Always wrap in a div, sticky or not — _footerAnchor()'s walk-up-to-gl's-
