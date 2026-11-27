@@ -390,9 +390,7 @@ export class CardTimeRange
 
         }
 
-        if( update ) {
-            for( let g of this.graphs ) this.applyTimeAxis(g);
-        }
+        if( update ) this.applyTimeAxes();
     }
 
     // The time labels' step drawn: Chart.js' — the one asked (setStepSize), unless its labels
@@ -461,9 +459,10 @@ export class CardTimeRange
 
     // Applies the current time window and tick step to graph g's time axis, and redraws it
     // (draw false: set only, for a drawing about to come — the graph resized) — the only place
-    // a graph's time axis is set (a time range set applies it: setStepSize)
+    // a graph's time axis is set (a time range set applies it: setStepSize) → whether it changed
     applyTimeAxis(g, draw = true)
     {
+        const _o = g.chart.options, _was = JSON.stringify([_o.hecRightAxisRoom, _o.scales.xAxes[0].time]);
         // (the room of a right Y axis kept on its right — Chart.js hecRightAxisRoom, px —, when it
         // has none: as wide as theirs, when one of its linked graphs has one — their time
         // aligned —, or, aligned justified (alignment), when another graph of the card has one)
@@ -476,15 +475,19 @@ export class CardTimeRange
         _time.stepSize = this.activeRange.tickStepSize;
         _time.min = this.startTime;
         _time.max = this.endTime;
-        if( !draw ) return;
+        const _changed = JSON.stringify([_o.hecRightAxisRoom, _time]) !== _was;
+        if( !draw ) return _changed;
         const _t = performance.now();
         this.redrawChart(g);
         perf.add('chart', performance.now() - _t, { graph: this.graphs.indexOf(g) });
+        return _changed;
     }
 
+    // Every graph's time axis applied (applyTimeAxis): a graph drawn again only when its axis
+    // changes
     applyTimeAxes()
     {
-        for( let g of this.graphs ) this.applyTimeAxis(g);
+        for( let g of this.graphs ) if( this.applyTimeAxis(g, false) ) this.applyTimeAxis(g);
     }
 
     // The time range `range` in its one form (see normalizeOptions): a number and its unit

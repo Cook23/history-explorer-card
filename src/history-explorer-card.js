@@ -262,17 +262,32 @@ export class HistoryCardState {
             if( _needsIntervalRedraw ) this.updateHistory();
 
             // Register observer to resize the graphs whenever the maincard dimensions change
-            let ro = new ResizeObserver(() => { this.resize(); });
-            ro.observe(this._this.querySelector('#maincard'));
+            // (the content's own: the one of a content made before stopped — see letGo)
+            this._resizeObserver?.disconnect();
+            this._resizeObserver = new ResizeObserver(() => { this.resize(); });
+            this._resizeObserver.observe(this._this.querySelector('#maincard'));
 
             // Update the info panel config in the browser local storage to sync with the YAML
             this.writeInfoPanelConfig();
 
-            // Set auto refresh interval, if any
-            if( this.pconfig.refreshInterval )
-                setInterval(this.refresh.bind(this), this.pconfig.refreshInterval * 1000);
+            // Set auto refresh interval, if any (the content's own, as above)
+            clearInterval(this._refreshTimer);
+            this._refreshTimer = this.pconfig.refreshInterval ? setInterval(this.refresh.bind(this), this.pconfig.refreshInterval * 1000) : null;
 
         }
+    }
+
+    // The card let go — off the page for good, see HistoryExplorerCard disconnectedCallback —:
+    // what its content started stopped (its timers, its observers), its graphs' charts
+    // destroyed — nothing of it left running
+    letGo()
+    {
+        clearInterval(this.iid); this.iid = null;
+        clearInterval(this._refreshTimer); this._refreshTimer = null;
+        this._resizeObserver?.disconnect(); this._resizeObserver = null;
+        this.clearGraphs();
+        this.stopWatchingShown();
+        this.contentValid = false;
     }
 
     updateContent()
@@ -445,26 +460,44 @@ class HistoryExplorerCard extends HTMLElement
     {
         perf.add('card', 0, { step: 'off the page', card: this.instance?.cid });
         this.instance?.leavePage();
+        // (let go PAGE_CARD_KEPT_MS later, unless back on the page or taken back meanwhile — see _letGo)
+        clearTimeout(this._letGoTid);
+        this._letGoTid = setTimeout(() => this._letGo(), PAGE_CARD_KEPT_MS);
         // (drawn: kept for a card made again on the page with the same name and YAML — it
-        // takes this one's content as it is, see InitWithConfig —, let go PAGE_CARD_KEPT_MS later)
+        // takes this one's content as it is, see InitWithConfig)
         if( !this.instance?.contentValid ) return;
         const k = this.instance.pageKey, l = PAGE_CARDS.get(k) ?? [];
-        if( l.some(x => x.el === this) ) return;
-        const x = { el: this, tid: setTimeout(() => { const m = PAGE_CARDS.get(k)?.filter(y => y !== x); if( m?.length ) PAGE_CARDS.set(k, m); else PAGE_CARDS.delete(k); }, PAGE_CARD_KEPT_MS) };
-        PAGE_CARDS.set(k, [...l, x]);
+        if( !l.includes(this) ) PAGE_CARDS.set(k, [...l, this]);
     }
 
     connectedCallback()
     {
         this._keepEditorRoom();
+        clearTimeout(this._letGoTid);
         // (made off the page: built now — or the card it replaces, off the page by now, taken back)
         if( this._pendingHass ) { const h = this._pendingHass; this._pendingHass = null; this.hass = h; }
         perf.add('card', 0, { step: 'on the page', card: this.instance?.cid });
         this.instance?.backOnPage();
         // (back itself: no longer for a card made again)
+        this._leavePageCards();
+    }
+
+    // (no longer among the cards off the page a card made again can take back)
+    _leavePageCards()
+    {
         const k = this.instance?.pageKey, l = PAGE_CARDS.get(k);
-        const x = l?.find(y => y.el === this);
-        if( x ) { clearTimeout(x.tid); if( l.length > 1 ) PAGE_CARDS.set(k, l.filter(y => y !== x)); else PAGE_CARDS.delete(k); }
+        if( !l?.includes(this) ) return;
+        if( l.length > 1 ) PAGE_CARDS.set(k, l.filter(y => y !== this)); else PAGE_CARDS.delete(k);
+    }
+
+    // The card off the page for good (PAGE_CARD_KEPT_MS): its content let go — nothing of it left
+    // running (letGo) —, made again from its YAML should it come back on the page
+    _letGo()
+    {
+        this._leavePageCards();
+        this.instance?.letGo();
+        this.instance = null;
+        if( this.config ) this.configSet = true;
     }
 
     // A card of the same name and YAML (key) off the page, drawn (see disconnectedCallback):
@@ -472,14 +505,14 @@ class HistoryExplorerCard extends HTMLElement
     // nothing built or drawn again, its width not waited for → whether one was taken
     _takeBack(key)
     {
-        const l = PAGE_CARDS.get(key), x = l?.find(y => !y.el.isConnected && y.el.instance?.contentValid);
+        const l = PAGE_CARDS.get(key), x = l?.find(y => !y.isConnected && y.instance?.contentValid);
         if( !x ) return false;
-        clearTimeout(x.tid);
-        if( l.length > 1 ) PAGE_CARDS.set(key, l.filter(y => y !== x)); else PAGE_CARDS.delete(key);
+        clearTimeout(x._letGoTid);
+        x._leavePageCards();
         const _t = performance.now();
-        this.instance = x.el.instance;
-        x.el.instance = null;
-        this.replaceChildren(...x.el.childNodes);
+        this.instance = x.instance;
+        x.instance = null;
+        this.replaceChildren(...x.childNodes);
         this.instance._this = this;
         this.instance.backOnPage();
         // (timed while the performance test records: its graphs moved here, then shown — the

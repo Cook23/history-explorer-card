@@ -121,7 +121,7 @@ export class CardOperations
         }
         // Saved after the rebuild: the graphIndex addGraph computed is saved
         this.writeLocalState();
-        this.updateHistory();
+        this.updateHistoryOf(tgt === src ? [src] : [src, tgt]);
         return null;
     }
 
@@ -178,7 +178,7 @@ export class CardOperations
         }
         // Saved after the rebuild: the graphIndex addGraph computed is saved
         this.writeLocalState();
-        this.updateHistory();
+        this.updateHistoryOf([g]);
     }
 
     // Graph g can be merged into the graph right above it: both of one group (linked), of
@@ -206,7 +206,7 @@ export class CardOperations
         this.rebuildGraph(_all, _groupId, _nextG);
         this._syncGroupOrder(_groupId);
         this.writeLocalState();
-        this.updateHistory();
+        this.updateHistoryOf([_upper, g]);
         return null;
     }
 
@@ -264,7 +264,7 @@ export class CardOperations
         for( const e of g.entities ) this.store.remove(e, true);
         this.removeGraphs([g]);
         this.refreshGraphControls();
-        this.updateHistory();
+        this.applyTimeAxes();
         this.writeLocalState();
     }
 
@@ -277,12 +277,14 @@ export class CardOperations
     // isn't a number, always a timeline. → their names
     addCurves(ids, type, lineMode)
     {
-        const _names = ids.map(id => {
+        const _added = this.buildingGraphs(() => ids.map(id => {
             const _numeric = this.isNumericEntity(id);
             const _det = _numeric && type === 'default' ? this.detectDefaultType(id) : null;
-            return this._addCurve(id, !_numeric ? 'timeline' : _det ? _det.type : type, !_numeric ? null : _det ? _det.lineMode : lineMode).name;
-        });
-        this.updateHistory();
+            return this._addCurve(id, !_numeric ? 'timeline' : _det ? _det.type : type, !_numeric ? null : _det ? _det.lineMode : lineMode);
+        }));
+        const _names = _added.map(a => a.name);
+        // (the graphs showing them: a graph they joined — rebuilt — or a new one)
+        this.updateHistoryOf(this.graphs.filter(g => _added.some(a => a.g === g)));
         this.writeLocalState();
         return _names;
     }
@@ -293,7 +295,7 @@ export class CardOperations
     addCurvesTo(g, ids, type, lineMode)
     {
         const _names = [];
-        for( const id of ids ) {
+        this.buildingGraphs(() => { for( const id of ids ) {
             if( g.entities.some(e => e.entity === id) ) continue;
             const _numeric = this.isNumericEntity(id);
             const _asked = !_numeric ? { type: 'timeline', lineMode: null } : type === 'default' ? this.detectDefaultType(id) : { type, lineMode };
@@ -303,8 +305,8 @@ export class CardOperations
             const _added = this._addCurve(id, _to.type, _to.lineMode, g);
             _names.push(_added.name);
             if( _added.g ) g = _added.g;
-        }
-        this.updateHistory();
+        } });
+        this.updateHistoryOf([g]);
         this.writeLocalState();
         return _names;
     }
@@ -336,7 +338,7 @@ export class CardOperations
         this.store.remove(_entity);
         this.refreshGraphControls();
         this.writeLocalState();
-        this.updateHistory();
+        this.updateHistoryOf([g]);
     }
 
     // --------------------------------------------------------------------------------------
@@ -355,7 +357,7 @@ export class CardOperations
         this._keepType([_entry], type, lineMode);
         if( _oldType === type ) {
             this.setLineMode(g, [idx], lineMode);
-            this.updateHistory();
+            this.updateHistoryOf([g]);
         } else {
             const _others = g.entities.filter((_, i) => i !== idx);
             _entity.siConversionFactor = undefined;
@@ -365,11 +367,13 @@ export class CardOperations
             const _nextG = this.nextGroup(g);
             this.detachGraph(g);
             // (each keeps its own fill across a type change: back to its former type, it has it again)
-            this.rebuildGraph(_others, _groupId, _nextG);
-            this.addGraph(_entity.entity, { color: _entry?.color ?? _entity.color, fill: _entry?.fill ?? _entity.fill, before: _nextG, interval: _entity.interval, groupId: _groupId, entry: _entry ?? _entity });
+            this.buildingGraphs(() => {
+                this.rebuildGraph(_others, _groupId, _nextG);
+                this.addGraph(_entity.entity, { color: _entry?.color ?? _entity.color, fill: _entry?.fill ?? _entity.fill, before: _nextG, interval: _entity.interval, groupId: _groupId, entry: _entry ?? _entity });
+            });
             this._keepFill([_entity]);
             this.refreshGraphControls();
-            this.updateHistory();
+            this.updateHistoryOf([g]);
         }
         this.writeLocalState();
     }
@@ -389,7 +393,7 @@ export class CardOperations
             else { g.entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; }); _rebuilt.push(g); }
         }
         if( _rebuilt.length ) { this.rebuildGraphs(_rebuilt); this._keepFill(_rebuilt.flatMap(g => g.entities)); }
-        else this.updateHistory();
+        else this.updateHistoryOf(gs);
         this.writeLocalState();
     }
 
@@ -429,11 +433,11 @@ export class CardOperations
     // looks, Y axes locked kept — e.g. in the colors of a new theme (followTheme)
     rebuildGraphsInPlace()
     {
-        for( const g of this.graphsInDisplayOrder() ) {
+        this.buildingGraphs(() => { for( const g of this.graphsInDisplayOrder() ) {
             const _nextG = this.nextGraph(g);
             this.detachGraph(g);
             this.rebuildGraph(g.entities, g.groupId, _nextG);
-        }
+        } });
         this.refreshGraphControls();
         this.updateHistory();
     }
@@ -451,11 +455,11 @@ export class CardOperations
     // worked out once for them all: theirs only (the series they show — every graph showing one)
     rebuildGraphs(gs, options = {})
     {
-        for( const g of gs ) {
+        this.buildingGraphs(() => { for( const g of gs ) {
             const _nextG = this.nextGraph(g);
             this.detachGraph(g);
             this.rebuildGraph(g.entities, g.groupId, _nextG, options);
-        }
+        } });
         this.refreshGraphControls();
         this.updateHistoryOf(gs);
     }
@@ -604,7 +608,7 @@ export class CardOperations
             this.detachGraph(g);
             this.rebuildGraph(_entities, g.groupId, _nextG, { interval });
         }
-        this.updateHistory();
+        this.updateHistoryOf([g]);
         this.writeLocalState();
     }
 

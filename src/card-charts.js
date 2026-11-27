@@ -1043,9 +1043,24 @@ export class CardCharts
         });
     }
 
+    // Graph gid of type with its curves (entities) and options (config), on its canvas, added
+    // to the card's — its chart built at the end of the operation adding it, once it knows all
+    // its curves (buildingGraphs, buildChart) → the graph
     addGraphToCanvas(gid, type, entities, config, isStatic = false)
     {
         const canvas = this._this.querySelector(`#graph${gid}`);
+        const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
+        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": null, "entities": entities, "interval": config._graphInterval, "ylock": config.ylock, "showTimeLabels": config.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null, "yAxesPending": false,
+                    "windowLoadsAtBuild": this.windowLoads(), "_config": config };
+        this.graphs.push(g);
+        return g;
+    }
+
+    // Graph g's chart built (see addGraphToCanvas): its datasets from its curves, its Y axes
+    buildChart(g)
+    {
+        const { type, entities, canvas, isStatic, _config: config } = g;
+        delete g._config;
 
         // Needed before building the datasets: it decides how each bar entity is drawn
         const interval = config._graphInterval;
@@ -1124,15 +1139,11 @@ export class CardCharts
         chart.options.closeButtonVisible = !isStatic;
         // (its move handle shown when the card has other graphs — set here, not drawn again for
         // it: see _updateMoVisibility)
-        chart.options.moveHandleVisible = this.graphs.length > 0;
+        chart.options.moveHandleVisible = this.graphs.length > 1;
         chart.options.closeButtonTitle = i18n('ui.menu.graph_delete');
 
-        const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
-
-        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config.ylock, "showTimeLabels": config.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null, "yAxesPending": _yAxesPending,
-                    "windowLoadsAtBuild": this.windowLoads() };
-
-        this.graphs.push(g);
+        g.chart = chart;
+        g.yAxesPending = _yAxesPending;
         this._watchShown(g);
     }
 
@@ -1172,6 +1183,13 @@ export class CardCharts
             }
         }, { threshold: SHOWN_THRESHOLDS });
         this._shownObserver.observe(g.canvas);
+    }
+
+    // No graph watched any more (see _watchShown): the card let go
+    stopWatchingShown()
+    {
+        this._shownObserver?.disconnect();
+        this._shownObserver = null;
     }
 
     getStateColor(domain, device_class, entity_id, value)

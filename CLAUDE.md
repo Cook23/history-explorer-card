@@ -408,6 +408,14 @@ around it. Search globally for the general cause it shows — which rule, in whi
 produces it for every case — explain that cause to the user, and propose the general rule
 that fixes it. The example then only checks that the rule holds.
 
+## The logic is the cake, the tests the cherry — set by the user, not negotiable
+
+A test is built on one example or a few — that is normal —, so a test never validates a logic:
+the reasoning does. The code's robustness comes from its logic, its standardization and its
+generality — the cake; the tests are the cherry on it. A change is right because its rule is
+general and logical, checked by reasoning over every case it covers; its tests passing only
+confirm it on their examples.
+
 ## Floating icons — set by the user
 
 The floating icons (the handle, the padlock, the chain, the close button) never reserve room

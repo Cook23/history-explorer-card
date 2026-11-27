@@ -621,11 +621,14 @@
     afterDraw: function (chart) {
       if (chart._hecOverlay) _hecPaintOverlay(chart);
     },
-    // (the chart gone: its overlay with it)
+    // (the chart gone: its overlay with it, and its tooltip — closed, nothing of the chart's
+    // hover left to end)
     destroy: function (chart) {
       var o = chart._hecOverlay;
       if (o && o.parentNode) o.parentNode.removeChild(o);
       chart._hecOverlay = null;
+      var _tip = chart.tooltip && chart.tooltip._hecHoverTooltipEl;
+      if (_tip) { _tip._hecOnEnd = null; Chart.hecUi.closeFloating(_tip); }
     } });
 
   // ---------------------------------------------------------------------------
@@ -1129,6 +1132,24 @@
 
     // How long a floating element takes to fade out (its CSS opacity transition)
     FADE: 1000,
+
+    // A tooltip shown only while the point it shows is on the screen (the viewport): hidden
+    // as soon as its point leaves it, shown again once its point is POINT_IN_PX inside it (a
+    // hysteresis: no flicker at the edge) — as it's placed, and as the page scrolls. Its place
+    // the same, its fade-out the same: hidden, never closed. el: a floating element placed for
+    // a point (el._hecPoint: { anchor — the element the point is on —, dx, dy — the point
+    // within it, in client pixels })
+    POINT_IN_PX: 10,
+    showIfPointShown: function (el) {
+      var p = el._hecPoint;
+      if (!p) return;
+      var r = p.anchor.getBoundingClientRect(), x = r.left + p.dx, y = r.top + p.dy;
+      var m = el._hecPointOut ? hecUi.POINT_IN_PX : 0;
+      var _in = x >= m && x <= window.innerWidth - m && y >= m && y <= window.innerHeight - m;
+      el._hecPointOut = !_in;
+      var _v = _in ? '' : 'hidden';
+      if (el.style.visibility !== _v) el.style.visibility = _v;
+    },
 
     // A pen above the screen hovers only while it sends moves: one gone out of range may
     // send nothing (no pointerleave), what its hover showed would stay. Called with each move
@@ -4412,6 +4433,20 @@
 
   // ── The hover tooltip, shown as a floating element (methods added to Chart.Tooltip) ──
 
+  // (as the page — or anything in it — scrolls: each tooltip open shown or hidden by where its
+  // point is now, hecUi.showIfPointShown, once a frame at most)
+  var _hecScrollFrame = 0;
+  window.addEventListener('scroll', function () {
+    if (_hecScrollFrame) return;
+    _hecScrollFrame = requestAnimationFrame(function () {
+      _hecScrollFrame = 0;
+      for (var _id in Chart.instances) {
+        var _t = Chart.instances[_id].tooltip, _el = _t && _t._hecHoverTooltipEl;
+        if (_el && _el.parentNode) Chart.hecUi.showIfPointShown(_el);
+      }
+    });
+  }, { capture: true, passive: true });
+
   helpers.extend(Chart.Tooltip.prototype, {
     // Only a gesture (justMoved) opens it; a redraw (a refresh of the data) only updates one
     // shown. onEnd: what goes with it when it ends, whatever ends it (Chart.hecUi.endFloating).
@@ -4419,6 +4454,8 @@
       var me = this;
       var _el = this._hecHoverTooltipEl;
       if (!justMoved && !(_el && _el.parentNode)) return;
+      // (opened anew: its point not yet seen out of the screen — see hecUi.showIfPointShown)
+      if (_el && !_el.parentNode) _el._hecPointOut = false;
       if (!_el) {
         _el = document.createElement('div');
         _el.id = 'hec-tooltip-hover';
@@ -4491,6 +4528,13 @@
           _caretEl.style.marginLeft = '0px';
         }
       }
+      // (shown only while its point is on the screen — hecUi.showIfPointShown —, checked
+      // again as the page scrolls)
+      if (caret && caret.x !== undefined) {
+        var _ar = anchorEl.getBoundingClientRect();
+        _el._hecPoint = { anchor: anchorEl, dx: caret.x - _ar.left, dy: caret.y - _ar.top };
+      } else _el._hecPoint = null;
+      Chart.hecUi.showIfPointShown(_el);
       Chart.hecUi.armAutoFade(_el, _readingTime, justMoved);
 
       function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }

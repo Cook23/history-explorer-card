@@ -132,12 +132,13 @@ export function optionsMenuHtml(i)
 
 // The symbol of each magnifier's mode (ZOOM_BOX_MODES) in its glass: the time (↔), the Y axes
 // (↕), both (⤢) — and the zoom buttons' beside the range selector: out (−), in (+)
-// (the symbol larger than the glass's hole, over its ring: the glass grey, the symbol in the
-// text's color stands out)
-const _ZOOM_BOX_SYMBOLS = { x: 'M4.18,9.5H14.82M4.18,9.5L6.38,7.3M4.18,9.5L6.38,11.7M14.82,9.5L12.62,7.3M14.82,9.5L12.62,11.7',
-                            y: 'M9.5,4.18V14.82M9.5,4.18L7.3,6.38M9.5,4.18L11.7,6.38M9.5,14.82L7.3,12.62M9.5,14.82L11.7,12.62',
-                            xy: 'M5.42,13.58L13.58,5.42M13.58,5.42H10.77M13.58,5.42V8.23M5.42,13.58H8.23M5.42,13.58V10.77',
-                            out: 'M4.18,9.5H14.82', in: 'M4.18,9.5H14.82M9.5,4.18V14.82' };
+// (the symbol within the glass's hole, clear of its ring — its stroke and outline included —:
+// the glass grey, the symbol in the text's color)
+// (each arrowhead one line through its tip: a sharp point there — the stroke's joins, mitred)
+const _ZOOM_BOX_SYMBOLS = { x: 'M5.24,9.5H13.76M7,7.74L5.24,9.5L7,11.26M12,7.74L13.76,9.5L12,11.26',
+                            y: 'M9.5,5.24V13.76M7.74,7L9.5,5.24L11.26,7M7.74,12L9.5,13.76L11.26,12',
+                            xy: 'M6.24,12.76L12.76,6.24M10.51,6.24H12.76V8.49M8.49,12.76H6.24V10.51',
+                            out: 'M5.24,9.5H13.76', in: 'M5.24,9.5H13.76M9.5,5.24V13.76' };
 // A magnifier's colors: its glass grey, its symbol in the text's color — or both in color —,
 // outlined in the background's (--hec-mag-bg: the toolbar's, opaque — see _paintMagnifiers)
 const _GLASS = 'var(--secondary-text-color)', _SYMBOL = 'var(--primary-text-color)';
@@ -147,7 +148,8 @@ const _OUTLINE = 'var(--hec-mag-bg, var(--card-background-color))';
 function _magnifierStrokes(size)
 {
     const dpr = window.devicePixelRatio || 1, units = px => px / dpr * 24 / size;
-    const _line = Math.max(1, Math.round(4 / 3 * dpr)), _border = Math.max(1, Math.round(3 / 4 * dpr));
+    // (the stroke about a CSS pixel, as the toolbar's '<' and '>')
+    const _line = Math.max(1, Math.round(dpr)), _border = Math.max(1, Math.round(3 / 4 * dpr));
     return { line: units(_line), outline: units(_line + 2 * _border) };
 }
 
