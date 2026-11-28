@@ -193,17 +193,25 @@ export function repaintMagnifierStrokes(root)
 }
 
 // changed() called each time the screen's density changes (devicePixelRatio: a zoom, another
-// screen, a web view telling its own only once started) → a function stopping it
+// screen, a web view telling its own only once started) — as the browser tells it (a media
+// query on it), or seen at a resize of the window → a function stopping it
 export function watchDensity(changed)
 {
-    let _mq, _on;
+    let _mq, _last = window.devicePixelRatio;
+    const _check = () => {
+        if( window.devicePixelRatio === _last ) return;
+        _last = window.devicePixelRatio;
+        _arm();
+        changed();
+    };
     const _arm = () => {
+        _mq?.removeEventListener('change', _check);
         _mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-        _on = () => { changed(); _arm(); };
-        _mq.addEventListener('change', _on, { once: true });
+        _mq.addEventListener('change', _check);
     };
     _arm();
-    return () => _mq.removeEventListener('change', _on);
+    window.addEventListener('resize', _check);
+    return () => { _mq.removeEventListener('change', _check); window.removeEventListener('resize', _check); };
 }
 
 // Real time's mark (under the toolbar's '>', see card-toolbar.js timeButtonsHtml): three

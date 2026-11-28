@@ -10,7 +10,7 @@ Changelog for the HA History Explorer Card.
 - *Behavior ▸ Cursor ▸ All graphs, with tooltips* shortened to *All with tooltips* (*Tous avec infobulle*…, in every language): as short as the menu's other lines
 
 ### Fixed
-- The magnifiers' symbols thinner or thicker from one opening to the next (1, 2 or 3 pixels of the screen, on the same tablet): their stroke worked out once, from the screen's density as the page read it when the card was made — the companion app's web view tells a passing one as it starts. Now given again each time the density changes (`repaintMagnifierStrokes`, `watchDensity`)
+- The magnifiers' symbols thinner or thicker from one opening to the next (1, 2 or 3 pixels of the screen, on the same tablet): their stroke worked out once, from the screen's density as the page read it when the card was made — the companion app's web view tells a passing one as it starts. Now given again each time the density changes — as the browser tells it, or seen at a resize of the window (`repaintMagnifierStrokes`, `watchDensity`)
 
 
 ## [v1.2.94] - 2026-11-27
