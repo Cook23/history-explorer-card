@@ -21,7 +21,7 @@ import { CardSelector } from "./card-selector.js";
 import { CardDatasets } from "./card-datasets.js";
 import { seriesOf } from "./history-series.js";
 import { CardGestures } from "./card-gestures.js";
-import { CardMenus } from "./card-menus.js";
+import { CardMenus, watchDensity, repaintMagnifierStrokes } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
 import { CardValues } from "./card-values.js";
 import { CardYaml } from "./card-yaml.js";
@@ -270,6 +270,11 @@ export class HistoryCardState {
             // Update the info panel config in the browser local storage to sync with the YAML
             this.writeInfoPanelConfig();
 
+            // (the magnifiers' strokes a whole number of the screen's pixels: given again when its
+            // density changes — the content's own, as above)
+            this._densityWatch?.();
+            this._densityWatch = watchDensity(() => repaintMagnifierStrokes(this._this));
+
             // Set auto refresh interval, if any (the content's own, as above)
             clearInterval(this._refreshTimer);
             this._refreshTimer = this.pconfig.refreshInterval ? setInterval(this.refresh.bind(this), this.pconfig.refreshInterval * 1000) : null;
@@ -285,6 +290,7 @@ export class HistoryCardState {
         clearInterval(this.iid); this.iid = null;
         clearInterval(this._refreshTimer); this._refreshTimer = null;
         this._resizeObserver?.disconnect(); this._resizeObserver = null;
+        this._densityWatch?.(); this._densityWatch = null;
         this.clearGraphs();
         this.stopWatchingShown();
         this.contentValid = false;

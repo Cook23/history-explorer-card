@@ -175,10 +175,35 @@ export function paintMagnifier(svg, mode, color)
 export function magnifierSvg(mode, color, size = 24)
 {
     const _d = _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy, _w = _magnifierStrokes(size);
-    return `<svg width="${size}" height="${size}" viewBox="${-24 / size} ${-2 * 24 / size} 24 24" style="vertical-align:middle;">` +
+    return `<svg data-mag-size="${size}" width="${size}" height="${size}" viewBox="${-24 / size} ${-2 * 24 / size} 24 24" style="vertical-align:middle;">` +
         `<path fill="${color ?? _GLASS}" d="M15.9,14.27L19.22,17.6L17.6,19.22L14.27,15.9ZM9.5,1A8.5,8.5 0 1,1 9.5,18A8.5,8.5 0 1,1 9.5,1ZM9.5,3A6.5,6.5 0 1,0 9.5,16A6.5,6.5 0 1,0 9.5,3Z" />` +
         `<path fill="none" stroke="${_OUTLINE}" stroke-width="${_w.outline}" stroke-linecap="round" d="${_d}" />` +
         `<path fill="none" stroke="${color ?? _SYMBOL}" stroke-width="${_w.line}" stroke-linecap="round" d="${_d}" /></svg>`;
+}
+
+// The magnifiers in root (magnifierSvg) given their strokes again, for the screen's density now —
+// each a whole number of its pixels (see _magnifierStrokes)
+export function repaintMagnifierStrokes(root)
+{
+    for( const svg of root?.querySelectorAll('svg[data-mag-size]') ?? [] ) {
+        const _w = _magnifierStrokes(+svg.dataset.magSize), [, _outline, _symbol] = svg.querySelectorAll('path');
+        _outline?.setAttribute('stroke-width', _w.outline);
+        _symbol?.setAttribute('stroke-width', _w.line);
+    }
+}
+
+// changed() called each time the screen's density changes (devicePixelRatio: a zoom, another
+// screen, a web view telling its own only once started) → a function stopping it
+export function watchDensity(changed)
+{
+    let _mq, _on;
+    const _arm = () => {
+        _mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+        _on = () => { changed(); _arm(); };
+        _mq.addEventListener('change', _on, { once: true });
+    };
+    _arm();
+    return () => _mq.removeEventListener('change', _on);
 }
 
 // Real time's mark (under the toolbar's '>', see card-toolbar.js timeButtonsHtml): three
